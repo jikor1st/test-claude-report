@@ -1,11 +1,45 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { BarChart3, Github } from 'lucide-react';
+import { BarChart3, ChartBar, Home, Activity } from 'lucide-react';
 import ProjectList from './components/ProjectList';
 import ProjectDetail from './components/ProjectDetail';
 import ReportViewer from './components/ReportViewer';
+import Statistics from './components/Statistics';
 import { AnalysisProvider } from './contexts/AnalysisContext';
+
+function Navigation() {
+  const location = useLocation();
+  
+  const navItems = [
+    { path: '/', label: '프로젝트', icon: Home },
+    { path: '/statistics', label: '통계', icon: ChartBar },
+  ];
+
+  return (
+    <nav className="flex gap-1 ml-auto">
+      {navItems.map(({ path, label, icon: Icon }) => {
+        const isActive = location.pathname === path || 
+                        (path === '/' && location.pathname.startsWith('/project'));
+        return (
+          <Link
+            key={path}
+            to={path}
+            className={`
+              flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
+              ${isActive 
+                ? 'bg-blue-100 text-blue-700 font-medium' 
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
+            `}
+          >
+            <Icon className="h-4 w-4" />
+            <span>{label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 function App() {
   return (
@@ -23,12 +57,14 @@ function App() {
                   <p className="text-xs text-muted-foreground">Claude Code 대화 세션 분석 도구</p>
                 </div>
               </div>
+              <Navigation />
             </div>
           </header>
           
           <main className="container mx-auto px-4 py-8">
             <Routes>
               <Route path="/" element={<ProjectList />} />
+              <Route path="/statistics" element={<Statistics />} />
               <Route path="/project/:id" element={<ProjectDetail />} />
               <Route path="/project/:id/report/:date" element={<ReportViewer />} />
             </Routes>
