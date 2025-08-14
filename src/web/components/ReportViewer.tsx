@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Code2, FileText, Tag, CheckCircle, AlertCircle, Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Code2, FileText, Tag, CheckCircle, AlertCircle, Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCheck, Download, FileDown, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -8,6 +8,8 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { DailyReport, SessionReport } from '../types';
 import { api } from '../utils/api';
 import { cn } from '../lib/utils';
+import { generateMarkdownFromReport, downloadMarkdown } from '../utils/exportUtils';
+import { generatePDFFromReport } from '../utils/pdfExportUtils';
 
 const ReportViewer: React.FC = () => {
   const { id, date } = useParams<{ id: string; date: string }>();
@@ -16,12 +18,47 @@ const ReportViewer: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<SessionReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (id && date) {
       loadReport(id, date);
     }
   }, [id, date]);
+
+  const handleExportMarkdown = (all: boolean) => {
+    if (!report) return;
+    
+    if (all) {
+      const markdown = generateMarkdownFromReport(report);
+      const filename = `${id}_${date}_full_report.md`;
+      downloadMarkdown(markdown, filename);
+    } else if (selectedSession) {
+      const markdown = generateMarkdownFromReport(report, selectedSession);
+      const filename = `${id}_${date}_${selectedSession.sessionId}.md`;
+      downloadMarkdown(markdown, filename);
+    }
+    setShowExportMenu(false);
+  };
+
+  const handleExportPDF = async (all: boolean) => {
+    if (!report) return;
+    
+    setExporting(true);
+    try {
+      if (all) {
+        await generatePDFFromReport(report);
+      } else if (selectedSession) {
+        await generatePDFFromReport(report, selectedSession);
+      }
+    } catch (error) {
+      console.error('PDF 생성 실패:', error);
+    } finally {
+      setExporting(false);
+      setShowExportMenu(false);
+    }
+  };
 
   const loadReport = async (projectId: string, reportDate: string) => {
     try {
@@ -107,6 +144,63 @@ const ReportViewer: React.FC = () => {
                 weekday: 'long'
               })} 리포트
             </h1>
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exporting}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                {exporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                내보내기
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-white border border-gray-200 z-10">
+                  <div className="py-1">
+                    <div className="px-4 py-2 text-xs text-gray-500 font-semibold uppercase">현재 세션</div>
+                    <button
+                      onClick={() => handleExportMarkdown(false)}
+                      disabled={!selectedSession}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      마크다운 (.md)
+                    </button>
+                    <button
+                      onClick={() => handleExportPDF(false)}
+                      disabled={!selectedSession}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      PDF (.pdf)
+                    </button>
+                    
+                    <div className="border-t border-gray-200 my-1"></div>
+                    
+                    <div className="px-4 py-2 text-xs text-gray-500 font-semibold uppercase">전체 리포트</div>
+                    <button
+                      onClick={() => handleExportMarkdown(true)}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      마크다운 (.md)
+                    </button>
+                    <button
+                      onClick={() => handleExportPDF(true)}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      PDF (.pdf)
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <p className="text-muted-foreground">{report.summary}</p>
