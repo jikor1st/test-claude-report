@@ -50,8 +50,8 @@ export async function analyzeWithClaudeCode(session: ClaudeSession): Promise<Cla
       // Claude Code CLI를 통해 분석 실행
       const analysisCommand = `claude < "${tempPromptFile}"`;
       const { stdout, stderr } = await execAsync(analysisCommand, {
-        maxBuffer: 1024 * 1024 * 10, // 10MB
-        timeout: 60000, // 60초 타임아웃
+        maxBuffer: 1024 * 1024 * 50, // 50MB로 증가
+        timeout: 120000, // 120초(2분) 타임아웃으로 증가
         encoding: 'utf8'
       });
       
@@ -110,19 +110,30 @@ async function checkClaudeCodeRunning(): Promise<boolean> {
  * 분석 프롬프트 생성
  */
 function createAnalysisPrompt(session: ClaudeSession): string {
+  // 모든 메시지를 포함하되, 너무 긴 메시지는 적절히 자름
   const conversationSummary = session.messages
-    .slice(0, 30) // 최대 30개 메시지만 사용
     .map((msg: ClaudeMessage, idx: number) => {
       // 메시지 내용 정리 (특수 문자 제거)
-      const cleanContent = msg.content
-        .substring(0, 200)
+      let cleanContent = msg.content
         .replace(/["""]/g, '"') // 특수 따옴표를 일반 따옴표로
         .replace(/\n/g, ' ') // 줄바꿈을 공백으로
         .replace(/\s+/g, ' ') // 연속된 공백을 하나로
         .trim();
-      return `${idx + 1}. [${msg.role}]: ${cleanContent}...`;
+      
+      // 개별 메시지가 너무 길면 자르기 (1000자)
+      if (cleanContent.length > 1000) {
+        cleanContent = cleanContent.substring(0, 1000) + '...';
+      }
+      
+      return `${idx + 1}. [${msg.role}]: ${cleanContent}`;
     })
     .join('\n');
+
+  // 대용량 세션인 경우 경고 메시지 추가
+  const isLargeSession = session.messages.length > 100;
+  const warningMessage = isLargeSession 
+    ? `\n⚠️ 주의: 이 세션은 ${session.messages.length}개의 메시지를 포함하는 대용량 세션입니다. 전체 대화의 맥락을 고려하여 분석해주세요.\n` 
+    : '';
 
   return `다음 개발 세션 대화를 분석하고 구조화된 JSON 형식으로 인사이트를 제공해주세요.
 
@@ -131,8 +142,8 @@ function createAnalysisPrompt(session: ClaudeSession): string {
 - 생성: ${new Date(session.created).toLocaleString('ko-KR')}
 - 마지막 수정: ${new Date(session.updated).toLocaleString('ko-KR')}
 - 총 메시지 수: ${session.messages.length}
-
-대화 요약:
+${warningMessage}
+전체 대화 내용:
 ${conversationSummary}
 
 아래의 정확한 JSON 구조로만 응답해주세요. 설명이나 추가 텍스트 없이 오직 JSON만 출력하세요.
