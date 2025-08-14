@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Code2, FileText, Tag, CheckCircle, AlertCircle, Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCheck, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Code2, FileText, Tag, CheckCircle, AlertCircle, Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -9,18 +9,6 @@ import type { DailyReport, SessionReport } from '../types';
 import { api } from '../utils/api';
 import { cn } from '../lib/utils';
 
-interface RawSessionData {
-  sessionId: string;
-  name: string;
-  created: string;
-  updated: string;
-  messages: Array<{
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp?: string;
-  }>;
-}
-
 const ReportViewer: React.FC = () => {
   const { id, date } = useParams<{ id: string; date: string }>();
   const [report, setReport] = useState<DailyReport | null>(null);
@@ -28,41 +16,12 @@ const ReportViewer: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<SessionReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
-  const [showRawData, setShowRawData] = useState(false);
-  const [rawData, setRawData] = useState<RawSessionData | null>(null);
-  const [loadingRawData, setLoadingRawData] = useState(false);
 
   useEffect(() => {
     if (id && date) {
       loadReport(id, date);
     }
   }, [id, date]);
-
-  useEffect(() => {
-    if (showRawData && !rawData && selectedSession && id) {
-      fetchRawData();
-    }
-  }, [showRawData, selectedSession]);
-
-  const fetchRawData = async () => {
-    if (!selectedSession || !id) return;
-    
-    setLoadingRawData(true);
-    try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(id)}/sessions/${encodeURIComponent(selectedSession.sessionId)}/raw`);
-      
-      if (!response.ok) {
-        throw new Error('원본 데이터를 가져오는데 실패했습니다');
-      }
-
-      const data = await response.json();
-      setRawData(data);
-    } catch (err) {
-      console.error('Error fetching raw data:', err);
-    } finally {
-      setLoadingRawData(false);
-    }
-  };
 
   const loadReport = async (projectId: string, reportDate: string) => {
     try {
@@ -223,18 +182,9 @@ const ReportViewer: React.FC = () => {
               {/* AI Insights 섹션 - 메인 섹션으로 이동 */}
               {selectedSession.aiInsights && (
                 <div className="px-6 py-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-yellow-500" />
-                      <h3 className="text-lg font-semibold">AI 분석 결과</h3>
-                    </div>
-                    <button
-                      onClick={() => setShowRawData(!showRawData)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
-                    >
-                      {showRawData ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                      {showRawData ? 'AI 분석 보기' : '원본 대화 보기'}
-                    </button>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="h-5 w-5 text-yellow-500" />
+                    <h3 className="text-lg font-semibold">AI 분석 결과</h3>
                   </div>
                   
                   {/* 주요 인사이트 */}
@@ -331,106 +281,59 @@ const ReportViewer: React.FC = () => {
               )}
 
               <div className="px-6 py-6 border-t">
-                <h3 className="text-lg font-semibold mb-4">{showRawData ? '원본 대화 내용' : '상세 내용'}</h3>
-                
-                {/* 원본 데이터 표시 */}
-                {showRawData ? (
-                  <div className="rounded-lg bg-gray-50 p-6">
-                    {loadingRawData ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                        <span className="ml-2 text-muted-foreground">원본 데이터 로딩 중...</span>
-                      </div>
-                    ) : rawData ? (
-                      <div className="space-y-4 max-h-[800px] overflow-y-auto">
-                        {rawData.messages.map((message, index) => (
-                          <div 
-                            key={index} 
-                            className={cn(
-                              "p-4 rounded-lg",
-                              message.role === 'user' 
-                                ? 'bg-blue-50 border border-blue-200' 
-                                : 'bg-white border border-gray-200'
-                            )}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={cn(
-                                "font-semibold",
-                                message.role === 'user' ? 'text-blue-700' : 'text-green-700'
-                              )}>
-                                {message.role === 'user' ? '💬 사용자' : '🤖 Claude'}
-                              </span>
-                              {message.timestamp && (
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(message.timestamp).toLocaleString('ko-KR')}
-                                </span>
-                              )}
-                            </div>
-                            <div className="whitespace-pre-wrap text-sm">
-                              {message.content}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        원본 데이터를 불러올 수 없습니다.
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="rounded-lg bg-gray-50 p-6">
-                    <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-muted-foreground prose-pre:bg-slate-950 prose-pre:text-slate-50">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          code({ node, inline, className, children, ...props }) {
-                            const match = /language-(\w+)/.exec(className || '');
-                            return !inline && match ? (
-                              <SyntaxHighlighter
-                                style={vscDarkPlus}
-                                language={match[1]}
-                                PreTag="div"
-                                className="rounded-md text-sm"
-                                {...props}
-                              >
-                                {String(children).replace(/\n$/, '')}
-                              </SyntaxHighlighter>
-                            ) : (
-                              <code className={`${className} bg-slate-100 px-1 py-0.5 rounded text-sm`} {...props}>
-                                {children}
-                              </code>
-                            );
-                          },
-                          h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
-                          h2: ({ children }) => <h2 className="text-xl font-semibold mt-5 mb-3">{children}</h2>,
-                          h3: ({ children }) => <h3 className="text-lg font-medium mt-4 mb-2">{children}</h3>,
-                          ul: ({ children }) => <ul className="list-disc pl-6 my-3 space-y-1">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal pl-6 my-3 space-y-1">{children}</ol>,
-                          li: ({ children }) => <li className="text-muted-foreground">{children}</li>,
-                          p: ({ children }) => <p className="my-3 leading-relaxed">{children}</p>,
-                          blockquote: ({ children }) => (
-                            <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4 text-muted-foreground">
+                <h3 className="text-lg font-semibold mb-4">상세 내용</h3>
+                <div className="rounded-lg bg-gray-50 p-6">
+                  <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-muted-foreground prose-pre:bg-slate-950 prose-pre:text-slate-50">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        code({ node, inline, className, children, ...props }) {
+                          const match = /language-(\w+)/.exec(className || '');
+                          return !inline && match ? (
+                            <SyntaxHighlighter
+                              style={vscDarkPlus}
+                              language={match[1]}
+                              PreTag="div"
+                              className="rounded-md text-sm"
+                              {...props}
+                            >
+                              {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                          ) : (
+                            <code className={`${className} bg-slate-100 px-1 py-0.5 rounded text-sm`} {...props}>
                               {children}
-                            </blockquote>
-                          ),
-                          table: ({ children }) => (
-                            <div className="overflow-x-auto my-4">
-                              <table className="min-w-full divide-y divide-border">{children}</table>
-                            </div>
-                          ),
-                          th: ({ children }) => (
-                            <th className="px-4 py-2 text-left text-sm font-medium bg-muted">{children}</th>
-                          ),
-                          td: ({ children }) => (
-                            <td className="px-4 py-2 text-sm border-t">{children}</td>
-                          ),
-                        }}
-                      >
-                        {selectedSession.mdxContent}
-                      </ReactMarkdown>
-                    </div>
+                            </code>
+                          );
+                        },
+                        h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-xl font-semibold mt-5 mb-3">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-lg font-medium mt-4 mb-2">{children}</h3>,
+                        ul: ({ children }) => <ul className="list-disc pl-6 my-3 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-6 my-3 space-y-1">{children}</ol>,
+                        li: ({ children }) => <li className="text-muted-foreground">{children}</li>,
+                        p: ({ children }) => <p className="my-3 leading-relaxed">{children}</p>,
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4 text-muted-foreground">
+                            {children}
+                          </blockquote>
+                        ),
+                        table: ({ children }) => (
+                          <div className="overflow-x-auto my-4">
+                            <table className="min-w-full divide-y divide-border">{children}</table>
+                          </div>
+                        ),
+                        th: ({ children }) => (
+                          <th className="px-4 py-2 text-left text-sm font-medium bg-muted">{children}</th>
+                        ),
+                        td: ({ children }) => (
+                          <td className="px-4 py-2 text-sm border-t">{children}</td>
+                        ),
+                      }}
+                    >
+                      {selectedSession.mdxContent}
+                    </ReactMarkdown>
                   </div>
+                </div>
                 )}
               </div>
             </div>

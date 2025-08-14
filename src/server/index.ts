@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import { homedir } from 'os';
 import { getClaudeProjectsPath, loadConfig } from '../cli/utils/config';
 import { scanProjects, loadProjectMetadata } from '../cli/utils/scanner';
@@ -246,6 +246,70 @@ app.get('/api/projects/:id/reports/:date', async (req, res) => {
   } catch (error) {
     console.error('Error fetching report:', error);
     res.status(500).json({ error: 'Failed to fetch report' });
+  }
+});
+
+// Get original session data
+app.get('/api/projects/:id/sessions/:sessionId/raw', async (req, res) => {
+  try {
+    const { id, sessionId } = req.params;
+    const decodedId = decodeURIComponent(id);
+    const decodedSessionId = decodeURIComponent(sessionId);
+    
+    console.log(`[RAW DATA API] Request for project: ${decodedId}, session: ${decodedSessionId}`);
+    
+    const claudeProjectsPath = await getClaudeProjectsPath();
+    const projectPath = join(claudeProjectsPath, decodedId);
+    
+    console.log(`[RAW DATA API] Project path: ${projectPath}`);
+    
+    // Find session file
+    const { findSessionFiles, parseSessionFile } = await import('../cli/utils/sessionAnalyzer');
+    const sessionFiles = await findSessionFiles(projectPath);
+    
+    console.log(`[RAW DATA API] Found ${sessionFiles.length} session files`);
+    
+    // Find the specific session file
+    let targetFile: string | null = null;
+    for (const filePath of sessionFiles) {
+      const fileName = basename(filePath);
+      console.log(`[RAW DATA API] Checking file: ${fileName} against sessionId: ${decodedSessionId}`);
+      if (fileName === decodedSessionId || fileName.includes(decodedSessionId)) {
+        targetFile = filePath;
+        console.log(`[RAW DATA API] Found matching file: ${targetFile}`);
+        break;
+      }
+    }
+    
+    if (!targetFile) {
+      console.log(`[RAW DATA API] No matching file found for sessionId: ${decodedSessionId}`);
+      console.log(`[RAW DATA API] Available files:`, sessionFiles.map(f => basename(f)));
+      return res.status(404).json({ 
+        error: 'Session file not found',
+        sessionId: decodedSessionId,
+        availableFiles: sessionFiles.map(f => basename(f))
+      });
+    }
+    
+    // Parse session file to get raw conversation data
+    const session = await parseSessionFile(targetFile);
+    if (!session) {
+      console.log(`[RAW DATA API] Failed to parse session file: ${targetFile}`);
+      return res.status(500).json({ error: 'Failed to parse session file' });
+    }
+    
+    console.log(`[RAW DATA API] Successfully parsed session with ${session.messages.length} messages`);
+    
+    res.json({
+      sessionId: session.id,
+      name: session.name,
+      created: session.created,
+      updated: session.updated,
+      messages: session.messages
+    });
+  } catch (error) {
+    console.error('[RAW DATA API] Error fetching raw session data:', error);
+    res.status(500).json({ error: 'Failed to fetch session data' });
   }
 });
 
