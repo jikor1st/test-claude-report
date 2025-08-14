@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Activity, Tag, TrendingUp, AlertTriangle, CheckCircle, Target, Lightbulb, Calendar, Layers, Package, GitPullRequest, GitMerge } from 'lucide-react';
+import { Activity, Tag, AlertTriangle, CheckCircle, Target, Lightbulb, Calendar, Layers, Package, GitPullRequest, GitMerge } from 'lucide-react';
 import type { GlobalStatistics } from '../../shared/types';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'];
@@ -9,7 +9,7 @@ export default function Statistics() {
   const [statistics, setStatistics] = useState<GlobalStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'topics' | 'quality' | 'tasks' | 'timeline'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'topics' | 'tasks' | 'timeline'>('overview');
   const [selectedProject, setSelectedProject] = useState<string>('all');
 
   useEffect(() => {
@@ -141,8 +141,7 @@ export default function Statistics() {
             {[
               { id: 'overview', label: '인사이트', icon: Lightbulb },
               { id: 'topics', label: '주요 토픽', icon: Tag },
-              { id: 'tasks', label: '작업 분석', icon: Target },
-              { id: 'quality', label: '코드 품질', icon: CheckCircle },
+              { id: 'tasks', label: 'Issues & Solutions', icon: Target },
               { id: 'timeline', label: '타임라인', icon: Calendar }
             ].map(({ id, label, icon: Icon }) => (
               <button
@@ -247,43 +246,6 @@ export default function Statistics() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {/* Code Quality Tab */}
-          {activeTab === 'quality' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                    주요 강점
-                  </h3>
-                  <div className="space-y-2">
-                    {statistics.codeQuality.totalStrengths.map((strength, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                        <span className="text-gray-800">{strength.description}</span>
-                        <span className="text-sm font-medium text-green-600">{strength.count}회</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-500" />
-                    개선 사항
-                  </h3>
-                  <div className="space-y-2">
-                    {statistics.codeQuality.totalImprovements.map((improvement, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                        <span className="text-gray-800">{improvement.description}</span>
-                        <span className="text-sm font-medium text-yellow-600">{improvement.count}회</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
           )}
