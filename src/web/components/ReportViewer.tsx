@@ -763,7 +763,7 @@ const ReportViewer: React.FC = () => {
                           ul: ({ children }) => <ul className="list-disc pl-6 my-3 space-y-1">{children}</ul>,
                           ol: ({ children }) => <ol className="list-decimal pl-6 my-3 space-y-1">{children}</ol>,
                           li: ({ children }) => <li className="text-muted-foreground break-words">{children}</li>,
-                          p: ({ children }) => <p className="my-3 leading-relaxed break-words">{children}</p>,
+                          p: ({ children }) => <p className="my-3 leading-relaxed break-words whitespace-pre-wrap">{children}</p>,
                           blockquote: ({ children }) => (
                             <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4 text-muted-foreground break-words">
                               {children}
