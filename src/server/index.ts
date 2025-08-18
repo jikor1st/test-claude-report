@@ -249,6 +249,122 @@ app.get('/api/projects/:id/reports/:date', async (req, res) => {
   }
 });
 
+// Reanalyze session with specific template
+app.post('/api/projects/:id/sessions/:sessionId/reanalyze', async (req, res) => {
+  try {
+    const { id, sessionId } = req.params;
+    const { templateType } = req.body;
+    const decodedId = decodeURIComponent(id);
+    const decodedSessionId = decodeURIComponent(sessionId);
+    
+    console.log(`[REANALYZE API] Request for project: ${decodedId}, session: ${decodedSessionId}, template: ${templateType}`);
+    
+    const claudeProjectsPath = await getClaudeProjectsPath();
+    const projectPath = join(claudeProjectsPath, decodedId);
+    
+    // Find session file
+    const { findSessionFiles, parseSessionFile } = await import('../cli/utils/sessionAnalyzer');
+    const sessionFiles = await findSessionFiles(projectPath);
+    
+    // Find the specific session file
+    let targetFile: string | null = null;
+    for (const filePath of sessionFiles) {
+      const fileName = basename(filePath);
+      if (fileName === decodedSessionId || fileName.includes(decodedSessionId)) {
+        targetFile = filePath;
+        break;
+      }
+    }
+    
+    if (!targetFile) {
+      return res.status(404).json({ error: 'Session file not found' });
+    }
+    
+    // Parse session file
+    const session = await parseSessionFile(targetFile);
+    if (!session) {
+      return res.status(500).json({ error: 'Failed to parse session file' });
+    }
+    
+    // Perform AI analysis with specific template
+    const { analyzeWithClaudeCode } = await import('../cli/utils/claudeApi');
+    const { loadMdTemplate, fillMdTemplate } = await import('../cli/utils/templates/mdTemplates');
+    
+    // Override template type if specified
+    if (templateType) {
+      console.log(`[REANALYZE API] Using specified template: ${templateType}`);
+    }
+    
+    const analysisResult = await analyzeWithClaudeCode(session);
+    
+    if (analysisResult) {
+      // Load and apply MD template
+      const selectedTemplate = templateType || analysisResult.templateType;
+      const mdTemplate = await loadMdTemplate(selectedTemplate);
+      const mdxContent = fillMdTemplate(mdTemplate, analysisResult.analysis, session);
+      
+      // Update the report
+      const projectReportDir = join(process.cwd(), 'reports', 'projects', decodedId);
+      const date = new Date(session.created).toISOString().split('T')[0];
+      const reportPath = join(projectReportDir, 'reports', `${date}.json`);
+      
+      // Load existing report
+      let dailyReport: DailyReport = { date, sessions: [] };
+      try {
+        const existingReport = await fs.readFile(reportPath, 'utf8');
+        dailyReport = JSON.parse(existingReport);
+      } catch {
+        // Report doesn't exist yet
+      }
+      
+      // Update or add session report
+      const sessionIndex = dailyReport.sessions.findIndex(s => s.sessionId === session.id);
+      const newSessionReport: SessionReport = {
+        sessionId: session.id,
+        date,
+        title: analysisResult.analysis.title,
+        summary: analysisResult.analysis.summary,
+        mdxContent,
+        keyTopics: [...analysisResult.analysis.technicalDetails.languages, ...analysisResult.analysis.technicalDetails.frameworks],
+        codeChanges: {
+          filesModified: [],
+          linesAdded: 0,
+          linesRemoved: 0
+        },
+        duration: '알 수 없음',
+        status: 'completed' as const,
+        aiInsights: {
+          keyInsights: analysisResult.analysis.keyInsights,
+          codeQuality: analysisResult.analysis.codeQuality,
+          timeline: analysisResult.analysis.timeline
+        }
+      };
+      
+      if (sessionIndex >= 0) {
+        dailyReport.sessions[sessionIndex] = newSessionReport;
+      } else {
+        dailyReport.sessions.push(newSessionReport);
+      }
+      
+      // Save updated report
+      await fs.mkdir(join(projectReportDir, 'reports'), { recursive: true });
+      await fs.writeFile(reportPath, JSON.stringify(dailyReport, null, 2));
+      
+      res.json({
+        success: true,
+        message: '재분석이 완료되었습니다.',
+        templateUsed: selectedTemplate,
+        report: newSessionReport
+      });
+    } else {
+      res.status(500).json({ error: 'AI 분석에 실패했습니다.' });
+    }
+  } catch (error) {
+    console.error('Reanalysis error:', error);
+    res.status(500).json({ error: '재분석 중 오류가 발생했습니다.' });
+  }
+});
+
 // Get original session data
 app.get('/api/projects/:id/sessions/:sessionId/raw', async (req, res) => {
   try {
@@ -410,10 +526,15 @@ app.post('/api/projects/:id/analyze-by-date', async (req, res) => {
     const analyzedSet = new Set(metadata.analyzedSessions || []);
     const dateSessionFiles: string[] = [];
     
-    // Filter sessions by date
+    // Filter sessions by date - check both analyzedSessions and existing report
+    const { loadDailyReport } = await import('../cli/utils/analyzer');
+    const existingReport = await loadDailyReport(projectReportDir, date);
+    const existingSessionIds = new Set(existingReport?.sessions.map(s => s.sessionId) || []);
+    
     for (const filePath of sessionFiles) {
       const sessionId = filePath.split('/').pop() || '';
-      if (!analyzedSet.has(sessionId)) {
+      // Skip if already analyzed or exists in report
+      if (!analyzedSet.has(sessionId) && !existingSessionIds.has(sessionId)) {
         const session = await parseSessionFile(filePath);
         if (session) {
           const sessionDate = new Date(session.created).toISOString().split('T')[0];
