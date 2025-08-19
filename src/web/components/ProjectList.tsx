@@ -70,7 +70,7 @@ const ProjectList: React.FC = () => {
           <div className="flex-1">
             <p className="text-sm font-medium text-destructive">{error}</p>
             <button 
-              onClick={loadProjects} 
+              onClick={() => loadProjects()} 
               className="mt-2 inline-flex items-center gap-1 text-sm text-destructive hover:underline"
             >
               <RefreshCw className="h-3 w-3" />

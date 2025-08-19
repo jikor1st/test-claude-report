@@ -17,7 +17,16 @@
       "Bash(echo:*)",
       "Bash(grep:*)",
       "Bash(rm:*)",
-      "Bash(npm run build:web:*)"
+      "Bash(npm run build:web:*)",
+      "Bash(npm run build:*)",
+      "Bash(chmod:*)",
+      "Bash(node:*)",
+      "Bash(npm view:*)",
+      "Bash(npm pack:*)",
+      "Bash(npm:*)",
+      "Bash(cat:*)",
+      "Bash(kill:*)",
+      "Bash(npx:*)"
     ],
     "deny": []
   }

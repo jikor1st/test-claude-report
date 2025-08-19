@@ -20,6 +20,10 @@ export interface SessionReport {
   status: "completed" | "in-progress" | "error";
   aiInsights?: {
     keyInsights: string[];
+    technicalDetails?: {
+      languages: string[];
+      frameworks: string[];
+    };
     codeQuality: {
       strengths: string[];
       improvements: string[];

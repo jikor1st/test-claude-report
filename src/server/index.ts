@@ -309,7 +309,12 @@ app.post('/api/projects/:id/sessions/:sessionId/reanalyze', async (req, res) => 
       const reportPath = join(projectReportDir, 'reports', `${date}.json`);
       
       // Load existing report
-      let dailyReport: DailyReport = { date, sessions: [] };
+      let dailyReport: DailyReport = { 
+        date, 
+        sessions: [],
+        totalSessions: 0,
+        summary: '0개의 세션 분석 완료'
+      };
       try {
         const existingReport = await fs.readFile(reportPath, 'utf8');
         dailyReport = JSON.parse(existingReport);
@@ -892,8 +897,8 @@ app.get('/api/statistics', async (req, res) => {
       },
       taskAnalysis: {
         mainTasks: [],
-        completedGoals: [],
-        challenges: []
+        issues: [],
+        commonSolutions: []
       },
       insights: {
         topInsights: [],
@@ -992,7 +997,7 @@ app.get('/api/statistics', async (req, res) => {
                   
                   // Extract issues and solutions from challenges and completed goals
                   // Challenges are treated as issues
-                  if (session.aiInsights.timeline.challenges) {
+                  if (session.aiInsights?.timeline?.challenges) {
                     session.aiInsights.timeline.challenges.forEach(challenge => {
                       const existing = issueMap.get(challenge) || { 
                         count: 0, 
@@ -1003,7 +1008,7 @@ app.get('/api/statistics', async (req, res) => {
                       existing.projects.add(projectDir);
                       
                       // Try to find related solutions from completed goals
-                      if (session.aiInsights.timeline.completedGoals) {
+                      if (session.aiInsights?.timeline?.completedGoals) {
                         session.aiInsights.timeline.completedGoals.forEach(goal => {
                           existing.solutions.set(goal, (existing.solutions.get(goal) || 0) + 1);
                           
@@ -1021,7 +1026,7 @@ app.get('/api/statistics', async (req, res) => {
                 }
                 
                 // Insights
-                if (session.aiInsights.keyInsights) {
+                if (session.aiInsights?.keyInsights) {
                   session.aiInsights.keyInsights.forEach(insight => {
                     const existing = insightCount.get(insight) || { frequency: 0, projects: new Set() };
                     existing.frequency++;
@@ -1037,7 +1042,7 @@ app.get('/api/statistics', async (req, res) => {
     }
     
     // Calculate percentages and format results
-    const totalTopicRefs = Array.from(topicCount.values()).reduce((a, b) => a.count + b.count, 0);
+    const totalTopicRefs = Array.from(topicCount.values()).reduce((a, b) => a + b.count, 0);
     
     statistics.dateRange = { start: earliestDate, end: latestDate };
     

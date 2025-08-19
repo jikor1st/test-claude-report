@@ -177,8 +177,8 @@ const ReportViewer: React.FC = () => {
       const data = await api.getReport(projectId, reportDate);
       
       // 중복 세션 제거 - 동일한 sessionId가 여러 개 있으면 마지막 것만 유지
-      const uniqueSessions = data.sessions.reduce((acc, session) => {
-        const existingIndex = acc.findIndex(s => s.sessionId === session.sessionId);
+      const uniqueSessions = data.sessions.reduce((acc: SessionReport[], session: SessionReport) => {
+        const existingIndex = acc.findIndex((s: SessionReport) => s.sessionId === session.sessionId);
         if (existingIndex >= 0) {
           // 기존 세션을 새 세션으로 교체 (재분석된 최신 버전 유지)
           acc[existingIndex] = session;
@@ -726,12 +726,13 @@ const ReportViewer: React.FC = () => {
                           components={{
                           // frontmatter 스타일 처리
                           hr: () => null, // --- 구분선 숨기기
-                          code({ node, inline, className, children, ...props }) {
+                          code({ node, className, children, ...props }: any) {
+                            const inline = node?.position ? false : true;
                             const match = /language-(\w+)/.exec(className || '');
                             return !inline && match ? (
                               <div className="overflow-x-auto my-3">
                                 <SyntaxHighlighter
-                                  style={vscDarkPlus}
+                                  style={vscDarkPlus as any}
                                   language={match[1]}
                                   PreTag="div"
                                   className="rounded-md text-xs"

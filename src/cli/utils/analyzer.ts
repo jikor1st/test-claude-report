@@ -89,7 +89,9 @@ sessionFiles count: ${sessionFiles.length}
           console.log(`  ✅ AI 분석 완료: ${session.name}`);
           
           // 템플릿 타입 가져오기 (analyzeWithClaudeCode에서 반환된 템플릿 타입 사용)
-          const { analysis: aiAnalysis, templateType } = aiAnalysisResult as any;
+          const analysisData = aiAnalysisResult as any;
+          const aiAnalysis = analysisData.analysis || analysisData;
+          const templateType = analysisData.templateType;
           
           // MD 템플릿 로드 및 적용 (2단계 분석으로 강화된 데이터 사용)
           let mdxContent: string;
@@ -97,20 +99,26 @@ sessionFiles count: ${sessionFiles.length}
             console.log(`  📝 MD 템플릿 적용: ${templateType}`);
             console.log(`  🔍 2단계 분석 데이터 포함됨`);
             const mdTemplate = await loadMdTemplate(templateType);
-            mdxContent = fillMdTemplate(mdTemplate, aiAnalysis || aiAnalysisResult, session);
+            mdxContent = fillMdTemplate(mdTemplate, aiAnalysis, session);
           } else {
             // 폴백: 기본 형식 사용
-            mdxContent = `# ${aiAnalysis?.title || aiAnalysisResult.title}\n\n## 요약\n${aiAnalysis?.summary || aiAnalysisResult.summary}\n\n## 주요 인사이트\n${(aiAnalysis?.keyInsights || aiAnalysisResult.keyInsights || []).map((insight: string) => `- ${insight}`).join('\n')}\n\n## 사용된 기술\n${[...(aiAnalysis?.technicalDetails?.languages || aiAnalysisResult.technicalDetails?.languages || []), ...(aiAnalysis?.technicalDetails?.frameworks || aiAnalysisResult.technicalDetails?.frameworks || [])].map((tech: string) => `- ${tech}`).join('\n')}`;
+            const title = aiAnalysis.title || '제목 없음';
+            const summary = aiAnalysis.summary || '요약 없음';
+            const keyInsights = aiAnalysis.keyInsights || [];
+            const languages = aiAnalysis.technicalDetails?.languages || [];
+            const frameworks = aiAnalysis.technicalDetails?.frameworks || [];
+            
+            mdxContent = `# ${title}\n\n## 요약\n${summary}\n\n## 주요 인사이트\n${keyInsights.map((insight: string) => `- ${insight}`).join('\n')}\n\n## 사용된 기술\n${[...languages, ...frameworks].map((tech: string) => `- ${tech}`).join('\n')}`;
           }
           
           // AI 분석 결과로만 리포트 생성
           const report: SessionReport = {
             sessionId: session.id,
             date: new Date(session.created).toISOString().split('T')[0],
-            title: aiAnalysis?.title || aiAnalysisResult.title,
-            summary: aiAnalysis?.summary || aiAnalysisResult.summary,
+            title: aiAnalysis.title || '제목 없음',
+            summary: aiAnalysis.summary || '요약 없음',
             mdxContent,
-            keyTopics: [...(aiAnalysis?.technicalDetails?.languages || aiAnalysisResult.technicalDetails?.languages || []), ...(aiAnalysis?.technicalDetails?.frameworks || aiAnalysisResult.technicalDetails?.frameworks || [])],
+            keyTopics: [...(aiAnalysis.technicalDetails?.languages || []), ...(aiAnalysis.technicalDetails?.frameworks || [])],
             codeChanges: {
               filesModified: [], // AI 분석에서는 파일 목록을 제공하지 않음
               linesAdded: 0,
@@ -119,9 +127,9 @@ sessionFiles count: ${sessionFiles.length}
             duration: '알 수 없음', // AI 분석에서는 duration을 제공하지 않음
             status: 'completed' as const,
             aiInsights: {
-              keyInsights: aiAnalysis?.keyInsights || aiAnalysisResult.keyInsights,
-              codeQuality: aiAnalysis?.codeQuality || aiAnalysisResult.codeQuality,
-              timeline: aiAnalysis?.timeline || aiAnalysisResult.timeline
+              keyInsights: aiAnalysis.keyInsights || [],
+              codeQuality: aiAnalysis.codeQuality || { strengths: [], improvements: [] },
+              timeline: aiAnalysis.timeline || { mainTasks: [], completedGoals: [], challenges: [] }
             }
           };
           
@@ -241,7 +249,9 @@ export async function analyzeSingleSession(
     if (aiAnalysisResult) {
       console.log(`  ✅ AI 분석 완료: ${session.name}`);
       
-      const { analysis: aiAnalysis, templateType } = aiAnalysisResult as any;
+      const analysisData = aiAnalysisResult as any;
+      const aiAnalysis = analysisData.analysis || analysisData;
+      const templateType = analysisData.templateType;
       
       // MD 템플릿 로드 및 적용 (2단계 분석으로 강화된 데이터 사용)
       const { loadMdTemplate, fillMdTemplate } = await import('./templates/mdTemplates');
@@ -252,17 +262,23 @@ export async function analyzeSingleSession(
         const mdTemplate = await loadMdTemplate(templateType);
         mdxContent = fillMdTemplate(mdTemplate, aiAnalysis, session);
       } else {
-        mdxContent = `# ${aiAnalysis.title}\n\n## 요약\n${aiAnalysis.summary}\n\n## 주요 인사이트\n${aiAnalysis.keyInsights.map(insight => `- ${insight}`).join('\n')}\n\n## 사용된 기술\n${[...aiAnalysis.technicalDetails.languages, ...aiAnalysis.technicalDetails.frameworks].map(tech => `- ${tech}`).join('\n')}`;
+        const title = aiAnalysis.title || '제목 없음';
+        const summary = aiAnalysis.summary || '요약 없음';
+        const keyInsights = aiAnalysis.keyInsights || [];
+        const languages = aiAnalysis.technicalDetails?.languages || [];
+        const frameworks = aiAnalysis.technicalDetails?.frameworks || [];
+        
+        mdxContent = `# ${title}\n\n## 요약\n${summary}\n\n## 주요 인사이트\n${keyInsights.map((insight: string) => `- ${insight}`).join('\n')}\n\n## 사용된 기술\n${[...languages, ...frameworks].map((tech: string) => `- ${tech}`).join('\n')}`;
       }
       
       // AI 분석 결과로 리포트 생성
       const report: SessionReport = {
         sessionId: session.id,
         date: new Date(session.created).toISOString().split('T')[0],
-        title: aiAnalysis.title,
-        summary: aiAnalysis.summary,
+        title: aiAnalysis.title || '제목 없음',
+        summary: aiAnalysis.summary || '요약 없음',
         mdxContent,
-        keyTopics: [...aiAnalysis.technicalDetails.languages, ...aiAnalysis.technicalDetails.frameworks],
+        keyTopics: [...(aiAnalysis.technicalDetails?.languages || []), ...(aiAnalysis.technicalDetails?.frameworks || [])],
         codeChanges: {
           filesModified: [],
           linesAdded: 0,
@@ -271,9 +287,9 @@ export async function analyzeSingleSession(
         duration: '알 수 없음',
         status: 'completed' as const,
         aiInsights: {
-          keyInsights: aiAnalysis.keyInsights,
-          codeQuality: aiAnalysis.codeQuality,
-          timeline: aiAnalysis.timeline
+          keyInsights: aiAnalysis.keyInsights || [],
+          codeQuality: aiAnalysis.codeQuality || { strengths: [], improvements: [] },
+          timeline: aiAnalysis.timeline || { mainTasks: [], completedGoals: [], challenges: [] }
         }
       };
       

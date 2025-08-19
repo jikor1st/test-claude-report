@@ -1,0 +1,13 @@
+{
+  "name": "my-test-analyzer",
+  "version": "1.0.0",
+  "description": "Claude Report Analyzer Project",
+  "scripts": {
+    "dashboard": "claude-report dashboard",
+    "scan": "claude-report scan",
+    "analyze": "claude-report scan --project ."
+  },
+  "dependencies": {
+    "claude-report-analyzer": "latest"
+  }
+}
