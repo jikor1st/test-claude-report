@@ -25,7 +25,7 @@ export interface TemplatePrompt {
 }
 
 export interface TemplateAnalysisResult {
-  templateType: TemplateType;
+  templateType: TemplateType | null; // null이면 템플릿 사용 안함
   confidence: number;  // 0-1 사이의 신뢰도
   reason: string;      // 선택 이유
 }

@@ -26,11 +26,18 @@ export async function analyzeWithClaudeCode(session: ClaudeSession): Promise<{ a
     
     // 템플릿 자동 선택
     const templateAnalysis = await TemplateSelector.selectTemplate(sessionContent);
-    console.log(`📝 선택된 템플릿: ${templateAnalysis.templateType} (신뢰도: ${(templateAnalysis.confidence * 100).toFixed(0)}%)`);
-    console.log(`   이유: ${templateAnalysis.reason}`);
-
-    // 분석 프롬프트 생성 (선택된 템플릿 사용)
-    const prompt = createAnalysisPromptWithTemplate(session, templateAnalysis.templateType);
+    
+    let prompt: string;
+    if (templateAnalysis.templateType) {
+      console.log(`📝 선택된 템플릿: ${templateAnalysis.templateType} (신뢰도: ${(templateAnalysis.confidence * 100).toFixed(0)}%)`);
+      console.log(`   이유: ${templateAnalysis.reason}`);
+      // 분석 프롬프트 생성 (선택된 템플릿 사용)
+      prompt = createAnalysisPromptWithTemplate(session, templateAnalysis.templateType);
+    } else {
+      console.log(`🆓 자유 분석 모드: ${templateAnalysis.reason}`);
+      // 자유 형식 분석 프롬프트 생성
+      prompt = createFreeFormAnalysisPrompt(session);
+    }
     
     // 프롬프트 크기 체크 및 제한
     const maxPromptSize = 30000; // 30KB 제한
@@ -160,6 +167,55 @@ function extractSessionContent(session: ClaudeSession): string {
   return session.messages
     .map((msg: ClaudeMessage) => `[${msg.role}]: ${msg.content}`)
     .join('\n');
+}
+
+/**
+ * 자유 형식 분석 프롬프트 생성 (템플릿 사용 안함)
+ */
+function createFreeFormAnalysisPrompt(session: ClaudeSession): string {
+  const sessionContent = extractSessionContent(session);
+  
+  return `다음은 Claude와 사용자 간의 대화 세션입니다. 이 세션을 분석하여 유용한 인사이트를 제공해주세요.
+
+=== 세션 내용 ===
+${sessionContent}
+
+=== 분석 요청 ===
+위 대화를 분석하여 다음과 같은 구조화된 정보를 JSON 형태로 제공해주세요:
+
+{
+  "title": "세션의 핵심 주제나 목적 (한 문장으로)",
+  "summary": "전체적인 요약 (2-3 문장)",
+  "keyInsights": [
+    "주요 발견사항이나 인사이트 1",
+    "주요 발견사항이나 인사이트 2",
+    "주요 발견사항이나 인사이트 3"
+  ],
+  "technicalDetails": {
+    "languages": ["사용된 프로그래밍 언어들"],
+    "frameworks": ["사용된 프레임워크나 라이브러리들"],
+    "tools": ["사용된 도구들"],
+    "concepts": ["다뤄진 기술적 개념들"]
+  },
+  "mainActivities": [
+    "주요 활동이나 작업들"
+  ],
+  "outcomes": [
+    "달성된 결과나 해결된 문제들"
+  ],
+  "nextSteps": [
+    "제안되는 다음 단계들 (있다면)"
+  ]
+}
+
+분석 시 다음 사항을 고려해주세요:
+- 대화의 맥락과 흐름을 파악
+- 사용자의 의도와 목표 식별
+- Claude가 제공한 도움의 유용성 평가
+- 학습이나 문제 해결의 과정 추적
+- 코드나 기술적 내용이 있다면 상세히 분석
+
+답변은 반드시 유효한 JSON 형식으로만 제공하고, 추가 설명은 하지 마세요.`;
 }
 
 /**
