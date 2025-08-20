@@ -10,7 +10,10 @@ import {
   CheckCircle,
   Clock,
   Menu,
-  X
+  X,
+  ChevronLeft,
+  Grid3x3,
+  List
 } from 'lucide-react';
 import ClaudeLogo from './ClaudeLogo';
 import { Project } from '../../shared/types';
@@ -27,6 +30,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   useEffect(() => {
     fetchProjects();
@@ -168,38 +173,63 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     const isSelected = selectedProjectId === project.id;
                     
                     return (
-                      <button
-                        key={project.id}
-                        onClick={() => navigate(`/project/${project.id}`)}
-                        className={`
-                          w-full text-left px-3 py-2 rounded-lg transition-all group
-                          ${isSelected 
-                            ? 'bg-gradient-to-r from-blue-50 to-purple-50 shadow-sm' 
-                            : 'hover:bg-gray-50'}
-                        `}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className={`p-1 rounded ${status.bg}`}>
-                              <StatusIcon className={`h-3.5 w-3.5 ${status.color}`} />
+                      <div key={project.id} className="relative group">
+                        <button
+                          onClick={() => navigate(`/project/${project.id}`)}
+                          className={`
+                            w-full text-left px-3 py-2 rounded-lg transition-all
+                            ${isSelected 
+                              ? 'bg-gradient-to-r from-blue-50 to-purple-50 shadow-sm' 
+                              : 'hover:bg-gray-50'}
+                          `}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className={`p-1 rounded flex-shrink-0 ${status.bg}`}>
+                                <StatusIcon className={`h-3.5 w-3.5 ${status.color}`} />
+                              </div>
+                              <span 
+                                className={`text-sm truncate ${isSelected ? 'font-medium text-gray-900' : 'text-gray-700'}`}
+                                title={project.name}
+                              >
+                                {project.name}
+                              </span>
                             </div>
-                            <span className={`text-sm truncate ${isSelected ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
-                              {project.name}
-                            </span>
+                            <ChevronRight className={`
+                              h-3.5 w-3.5 text-gray-400 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity
+                              ${isSelected ? 'opacity-100' : ''}
+                            `} />
                           </div>
-                          <ChevronRight className={`
-                            h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity
-                            ${isSelected ? 'opacity-100' : ''}
-                          `} />
-                        </div>
-                        {project.unanalyzedSessionsCount > 0 && (
-                          <div className="mt-1 ml-7">
-                            <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
-                              {project.unanalyzedSessionsCount}개 미분석
-                            </span>
+                          {project.unanalyzedSessionsCount > 0 && (
+                            <div className="mt-1 flex items-center gap-1 pl-7">
+                              <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse" />
+                              <span className="text-xs text-yellow-600">
+                                {project.unanalyzedSessionsCount} 새 세션
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                        
+                        {/* Hover Tooltip for full name */}
+                        {project.name.length > 20 && (
+                          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
+                            <div className={`
+                              bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg
+                              opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                              whitespace-nowrap max-w-xs
+                              ${!isOpen ? 'hidden' : ''}
+                            `}>
+                              <div className="font-medium">{project.name}</div>
+                              {project.totalReports > 0 && (
+                                <div className="text-gray-300 mt-1">
+                                  {project.totalReports} 리포트 · {project.totalSessions || 0} 세션
+                                </div>
+                              )}
+                              <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                            </div>
                           </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })
                 )}

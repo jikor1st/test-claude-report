@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import Sidebar from './components/Sidebar';
+import SidebarNew from './components/SidebarNew';
 import Dashboard from './components/Dashboard';
 import ProjectDetail from './components/ProjectDetail';
 import ReportViewer from './components/ReportViewer';
@@ -15,9 +15,9 @@ function App() {
     <AnalysisProvider>
       <Router>
         <div className="min-h-screen bg-gray-50">
-          <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+          <SidebarNew isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
           
-          <div className="md:ml-64 transition-all duration-300">
+          <div className="md:ml-80 transition-all duration-300">
             <main className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
               <div className="container mx-auto px-4 xl:px-8">
                 <Routes>
