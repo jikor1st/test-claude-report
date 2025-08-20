@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Code2, FileText, Tag, CheckCircle, AlertCircle, Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCheck, ToggleLeft, ToggleRight, Download, FileDown, ChevronDown, RefreshCw, User, Folder } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Code2, FileText, Tag, CheckCircle, AlertCircle, Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCheck, ToggleLeft, ToggleRight, Download, FileDown, ChevronDown, RefreshCw, User, Folder, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -65,6 +65,8 @@ const ReportViewer: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [showTemplateSelect, setShowTemplateSelect] = useState(false);
+  const templateSelectRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (id && date) {
@@ -77,6 +79,37 @@ const ReportViewer: React.FC = () => {
       fetchRawData();
     }
   }, [showRawData, selectedSession]);
+
+  // 외부 클릭 감지를 위한 이벤트 리스너
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // 템플릿 선택 popover 외부 클릭 감지
+      if (templateSelectRef.current && !templateSelectRef.current.contains(event.target as Node)) {
+        // 재분석 버튼 클릭은 제외 (토글 동작을 위해)
+        const isReanalyzeButton = (event.target as HTMLElement).closest('[data-reanalyze-button]');
+        if (!isReanalyzeButton) {
+          setShowTemplateSelect(false);
+        }
+      }
+      
+      // 내보내기 메뉴 외부 클릭 감지
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        // 내보내기 버튼 클릭은 제외
+        const isExportButton = (event.target as HTMLElement).closest('[data-export-button]');
+        if (!isExportButton) {
+          setShowExportMenu(false);
+        }
+      }
+    };
+
+    // 이벤트 리스너 등록
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // 컴포넌트 언마운트 시 이벤트 리스너 제거
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTemplateSelect, showExportMenu]);
 
   const fetchRawData = async () => {
     if (!selectedSession || !id) return;
@@ -279,6 +312,7 @@ const ReportViewer: React.FC = () => {
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 disabled={exporting}
+                data-export-button
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 {exporting ? (
@@ -291,7 +325,7 @@ const ReportViewer: React.FC = () => {
               </button>
               
               {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-white border border-gray-200 z-10">
+                <div ref={exportMenuRef} className="absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-white border border-gray-200 z-10">
                   <div className="py-1">
                     <div className="px-4 py-2 text-xs text-gray-500 font-semibold uppercase">현재 세션</div>
                     <button
@@ -416,6 +450,7 @@ const ReportViewer: React.FC = () => {
                         <button
                           onClick={() => setShowTemplateSelect(!showTemplateSelect)}
                           disabled={reanalyzing}
+                          data-reanalyze-button
                           className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
                         >
                           {reanalyzing ? (
@@ -432,7 +467,7 @@ const ReportViewer: React.FC = () => {
                         </button>
                         
                         {showTemplateSelect && !reanalyzing && (
-                          <div className="absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white border border-gray-200 z-10 max-h-96 overflow-y-auto">
+                          <div ref={templateSelectRef} className="absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white border border-gray-200 z-10 max-h-96 overflow-y-auto">
                             <div className="p-4">
                               <h4 className="text-sm font-semibold mb-3">템플릿 선택</h4>
                               <p className="text-xs text-gray-500 mb-3">분석에 사용할 템플릿을 선택하세요</p>
@@ -605,7 +640,61 @@ const ReportViewer: React.FC = () => {
                                 remarkPlugins={[remarkGfm]}
                                 components={{
                                   p: ({ children }) => <p className="whitespace-pre-wrap break-words">{children}</p>,
-                                  code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs break-all">{children}</code>
+                                  code({ node, inline, className, children, ...props }) {
+                                    const match = /language-(\w+)/.exec(className || '');
+                                    const [copied, setCopied] = useState(false);
+                                    
+                                    const handleCopy = () => {
+                                      navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+                                      setCopied(true);
+                                      setTimeout(() => setCopied(false), 2000);
+                                    };
+                                    
+                                    return !inline && match ? (
+                                      <div className="relative group my-3">
+                                        <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-gray-800 to-gray-700 rounded-t-md flex items-center justify-between px-3">
+                                          <span className="text-xs font-medium text-gray-300">{match[1]}</span>
+                                          <button
+                                            onClick={handleCopy}
+                                            className="flex items-center gap-1 text-xs text-gray-300 hover:text-white transition-colors"
+                                          >
+                                            {copied ? (
+                                              <>
+                                                <Check className="w-3 h-3" />
+                                                복사됨
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Copy className="w-3 h-3" />
+                                                복사
+                                              </>
+                                            )}
+                                          </button>
+                                        </div>
+                                        <SyntaxHighlighter
+                                          style={vscDarkPlus}
+                                          language={match[1]}
+                                          PreTag="div"
+                                          showLineNumbers={true}
+                                          customStyle={{
+                                            margin: 0,
+                                            paddingTop: '2.5rem',
+                                            paddingBottom: '1rem',
+                                            paddingLeft: '1rem',
+                                            paddingRight: '1rem',
+                                            fontSize: '0.75rem',
+                                            lineHeight: '1.6',
+                                            backgroundColor: '#1e1e1e',
+                                            borderRadius: '0.375rem'
+                                          }}
+                                        >
+                                          {String(children).replace(/\n$/, '')}
+                                        </SyntaxHighlighter>
+                                      </div>
+                                    ) : (
+                                      <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                                    );
+                                  }
                                 }}
                               >
                                 {message.content}
@@ -719,8 +808,8 @@ const ReportViewer: React.FC = () => {
                     })()}
                     
                     {/* 본문 내용 */}
-                    <div className="rounded-lg bg-gray-50 p-6 overflow-hidden">
-                      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-muted-foreground prose-pre:bg-slate-950 prose-pre:text-slate-50 break-words">
+                    <div className="rounded-lg bg-white border border-gray-200 p-6 overflow-hidden">
+                      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-muted-foreground break-words">
                         <ReactMarkdown 
                           remarkPlugins={[remarkGfm]}
                           components={{
@@ -728,45 +817,78 @@ const ReportViewer: React.FC = () => {
                           hr: () => null, // --- 구분선 숨기기
                           code({ node, inline, className, children, ...props }) {
                             const match = /language-(\w+)/.exec(className || '');
+                            const [copied, setCopied] = useState(false);
+                            
+                            const handleCopy = () => {
+                              navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            };
+                            
                             return !inline && match ? (
-                              <div className="overflow-x-auto my-3">
-                                <SyntaxHighlighter
-                                  style={vscDarkPlus}
-                                  language={match[1]}
-                                  PreTag="div"
-                                  className="rounded-md text-xs"
-                                  wrapLongLines={true}
-                                  showLineNumbers={false}
-                                  customStyle={{
-                                    margin: 0,
-                                    padding: '1rem',
-                                    fontSize: '0.875rem',
-                                    lineHeight: '1.8',
-                                    maxHeight: match[1] === 'yaml' ? 'none' : '400px',
-                                    overflow: 'auto',
-                                    backgroundColor: match[1] === 'yaml' ? '#f8f9fa' : undefined
-                                  }}
-                                  {...props}
-                                >
-                                  {String(children).replace(/\n$/, '')}
-                                </SyntaxHighlighter>
+                              <div className="relative group my-6">
+                                <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-gray-900 to-gray-800 rounded-t-lg flex items-center justify-between px-4">
+                                  <span className="text-xs font-medium text-gray-400">{match[1]}</span>
+                                  <button
+                                    onClick={handleCopy}
+                                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+                                  >
+                                    {copied ? (
+                                      <>
+                                        <Check className="w-3 h-3" />
+                                        복사됨
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-3 h-3" />
+                                        복사
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                                <div className="overflow-hidden rounded-lg shadow-xl">
+                                  <SyntaxHighlighter
+                                    style={vscDarkPlus}
+                                    language={match[1]}
+                                    PreTag="div"
+                                    className="!mt-0"
+                                    wrapLongLines={true}
+                                    showLineNumbers={true}
+                                    customStyle={{
+                                      margin: 0,
+                                      paddingTop: '3rem',
+                                      paddingBottom: '1rem',
+                                      paddingLeft: '1rem',
+                                      paddingRight: '1rem',
+                                      fontSize: '0.875rem',
+                                      lineHeight: '1.7',
+                                      maxHeight: '500px',
+                                      overflow: 'auto',
+                                      backgroundColor: '#1e1e1e',
+                                      borderRadius: '0.5rem'
+                                    }}
+                                    {...props}
+                                  >
+                                    {String(children).replace(/\n$/, '')}
+                                  </SyntaxHighlighter>
+                                </div>
                               </div>
                             ) : (
-                              <code className={`${className} bg-slate-100 px-1 py-0.5 rounded text-sm break-all`} {...props}>
+                              <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
                                 {children}
                               </code>
                             );
                           },
-                          h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
-                          h2: ({ children }) => <h2 className="text-xl font-semibold mt-5 mb-3">{children}</h2>,
-                          h3: ({ children }) => <h3 className="text-lg font-medium mt-4 mb-2">{children}</h3>,
-                          ul: ({ children }) => <ul className="list-disc pl-6 my-3 space-y-1">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal pl-6 my-3 space-y-1">{children}</ol>,
-                          li: ({ children }) => <li className="text-muted-foreground break-words">{children}</li>,
-                          p: ({ children }) => <p className="my-3 leading-relaxed break-words whitespace-pre-wrap">{children}</p>,
+                          h1: ({ children }) => <h1 className="text-2xl font-bold mt-8 mb-4 text-gray-900">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-xl font-semibold mt-6 mb-3 text-gray-800">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-lg font-medium mt-5 mb-2 text-gray-700">{children}</h3>,
+                          ul: ({ children }) => <ul className="list-disc pl-6 my-4 space-y-2">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-6 my-4 space-y-2">{children}</ol>,
+                          li: ({ children }) => <li className="text-gray-600 leading-relaxed">{children}</li>,
+                          p: ({ children }) => <p className="my-4 leading-relaxed text-gray-700 whitespace-pre-wrap">{children}</p>,
                           blockquote: ({ children }) => (
-                            <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4 text-muted-foreground break-words">
-                              {children}
+                            <blockquote className="border-l-4 border-blue-400 pl-4 my-6 bg-blue-50 py-3 pr-4 rounded-r-lg">
+                              <p className="text-gray-700 italic">{children}</p>
                             </blockquote>
                           ),
                           table: ({ children }) => (
