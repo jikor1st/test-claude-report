@@ -71,6 +71,33 @@ export interface Project {
   unanalyzedCount?: number;
 }
 
+export interface Statistics {
+  totalProjects: number;
+  totalSessions: number;
+  totalReports: number;
+  topTopics?: Array<{
+    topic: string;
+    count: number;
+    percentage: number;
+  }>;
+  timeline: {
+    dailyActivity: Array<{
+      date: string;
+      sessionCount: number;
+    }>;
+    averageDailySessions: number;
+  };
+  keyInsights?: Array<{
+    insight: string;
+    projects: string[];
+  }>;
+  issuesSolutions?: Array<{
+    issue: string;
+    solution: string;
+    count: number;
+  }>;
+}
+
 export interface GlobalStatistics {
   totalProjects: number;
   totalSessions: number;

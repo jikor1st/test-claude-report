@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Activity, Tag, AlertTriangle, CheckCircle, Target, Lightbulb, Calendar, Layers, Package, GitPullRequest, GitMerge } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { Activity, Tag, AlertTriangle, CheckCircle, Target, Lightbulb, Calendar, Layers, Package, GitPullRequest, GitMerge, TrendingUp, ArrowUpRight, Filter } from 'lucide-react';
 import type { GlobalStatistics } from '../../shared/types';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'];
+const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#14b8a6', '#f97316', '#06b6d4', '#84cc16', '#ef4444'];
 
 export default function Statistics() {
   const [statistics, setStatistics] = useState<GlobalStatistics | null>(null);
@@ -66,25 +66,25 @@ export default function Statistics() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-8">
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">통계 대시보드</h1>
-            <p className="text-gray-600">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">전체 통계 분석</h1>
+            <p className="text-gray-500">
               {statistics.dateRange.start && statistics.dateRange.end
-                ? `${statistics.dateRange.start} ~ ${statistics.dateRange.end}`
+                ? `${new Date(statistics.dateRange.start).toLocaleDateString('ko-KR')} ~ ${new Date(statistics.dateRange.end).toLocaleDateString('ko-KR')}`
                 : '데이터 수집 중...'}
             </p>
           </div>
           
           {/* Project Selector */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">프로젝트:</label>
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-200">
+            <Filter className="h-4 w-4 text-gray-400" />
             <select
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-sm font-medium bg-transparent focus:outline-none cursor-pointer"
             >
               <option value="all">전체 프로젝트</option>
               {statistics.projectList?.map(project => (
@@ -98,46 +98,70 @@ export default function Statistics() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <Package className="h-8 w-8 text-blue-500" />
-            <span className="text-2xl font-bold text-gray-900">{statistics.totalProjects}</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-200 rounded-full blur-3xl opacity-30" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2 bg-white rounded-xl shadow-sm">
+                <Package className="h-5 w-5 text-blue-600" />
+              </div>
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{statistics.totalProjects}</p>
+            <p className="text-sm text-gray-600 mt-1">총 프로젝트</p>
           </div>
-          <p className="text-gray-600">총 프로젝트</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <Activity className="h-8 w-8 text-green-500" />
-            <span className="text-2xl font-bold text-gray-900">{statistics.totalSessions}</span>
+        <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 border border-purple-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-200 rounded-full blur-3xl opacity-30" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2 bg-white rounded-xl shadow-sm">
+                <Activity className="h-5 w-5 text-purple-600" />
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-purple-600" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{statistics.totalSessions}</p>
+            <p className="text-sm text-gray-600 mt-1">총 세션</p>
           </div>
-          <p className="text-gray-600">총 세션</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <Layers className="h-8 w-8 text-purple-500" />
-            <span className="text-2xl font-bold text-gray-900">{statistics.totalReports}</span>
+        <div className="relative overflow-hidden bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-6 border border-pink-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-pink-200 rounded-full blur-3xl opacity-30" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2 bg-white rounded-xl shadow-sm">
+                <Layers className="h-5 w-5 text-pink-600" />
+              </div>
+              <TrendingUp className="h-4 w-4 text-pink-600" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{statistics.totalReports}</p>
+            <p className="text-sm text-gray-600 mt-1">총 리포트</p>
           </div>
-          <p className="text-gray-600">총 리포트</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <Calendar className="h-8 w-8 text-orange-500" />
-            <span className="text-2xl font-bold text-gray-900">
+        <div className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-6 border border-amber-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200 rounded-full blur-3xl opacity-30" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2 bg-white rounded-xl shadow-sm">
+                <Calendar className="h-5 w-5 text-amber-600" />
+              </div>
+              <Activity className="h-4 w-4 text-amber-600" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900">
               {statistics.timeline.dailyActivity.length}
-            </span>
+            </p>
+            <p className="text-sm text-gray-600 mt-1">활동 일수</p>
           </div>
-          <p className="text-gray-600">활동 일수</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-6">
+        <div className="border-b border-gray-100">
+          <nav className="flex p-1">
             {[
               { id: 'overview', label: '인사이트', icon: Lightbulb },
               { id: 'topics', label: '주요 토픽', icon: Tag },
@@ -148,10 +172,10 @@ export default function Statistics() {
                 key={id}
                 onClick={() => setActiveTab(id as any)}
                 className={`
-                  flex items-center gap-2 px-6 py-3 border-b-2 font-medium text-sm
+                  flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium text-sm transition-all
                   ${activeTab === id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                    : 'text-gray-600 hover:bg-gray-50'}
                 `}
               >
                 <Icon className="h-4 w-4" />
@@ -169,15 +193,25 @@ export default function Statistics() {
                 <h3 className="text-lg font-semibold mb-4">
                   {selectedProject !== 'all' ? `${selectedProject} 프로젝트 인사이트` : '전체 프로젝트 인사이트'}
                 </h3>
-                <div className="space-y-3">
+                <div className="grid gap-4">
                   {statistics.insights.topInsights.slice(0, 5).map((insight, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                      <Lightbulb className="h-5 w-5 text-blue-500 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-gray-800">{insight.insight}</p>
-                        <div className="mt-1 flex items-center gap-4 text-sm text-gray-600">
-                          <span>빈도: {insight.frequency}</span>
-                          <span>프로젝트: {insight.projects.length}개</span>
+                    <div key={index} className="group relative overflow-hidden bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 rounded-xl p-4 border border-gray-200 hover:shadow-lg transition-all">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-200 to-purple-200 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                      <div className="relative flex items-start gap-3">
+                        <div className="p-2 bg-white rounded-lg shadow-sm">
+                          <Lightbulb className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-gray-800 font-medium">{insight.insight}</p>
+                          <div className="mt-2 flex items-center gap-4 text-sm">
+                            <span className="inline-flex items-center gap-1 text-blue-600">
+                              <TrendingUp className="h-3 w-3" />
+                              {insight.frequency}회
+                            </span>
+                            <span className="text-gray-500">
+                              {insight.projects.length}개 프로젝트
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -197,23 +231,28 @@ export default function Statistics() {
               </div>
               
               {/* Topic Cloud Style Display */}
-              <div className="bg-gray-50 rounded-lg p-6">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
                 <div className="flex flex-wrap gap-3">
                   {statistics.keyTopics?.map((topic, index) => {
-                    const sizeClass = index < 3 ? 'text-lg font-semibold' : 
-                                     index < 8 ? 'text-base font-medium' : 
-                                     'text-sm';
+                    const sizeClass = index < 3 ? 'text-base font-bold px-5 py-3' : 
+                                     index < 8 ? 'text-sm font-semibold px-4 py-2' : 
+                                     'text-xs font-medium px-3 py-2';
                     const colorClass = COLORS[index % COLORS.length];
                     
                     return (
                       <div
                         key={topic.topic}
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-sm border ${sizeClass}`}
-                        style={{ borderColor: colorClass, color: colorClass }}
+                        className={`inline-flex items-center gap-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all cursor-pointer group ${sizeClass}`}
+                        style={{ 
+                          borderWidth: '2px',
+                          borderColor: colorClass + '40',
+                          backgroundColor: colorClass + '08'
+                        }}
                       >
-                        <Tag className="h-4 w-4" />
-                        <span>{topic.topic}</span>
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded-full text-gray-600">
+                        <Tag className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" style={{ color: colorClass }} />
+                        <span style={{ color: colorClass }}>{topic.topic}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold" 
+                          style={{ backgroundColor: colorClass + '20', color: colorClass }}>
                           {topic.count}
                         </span>
                       </div>
@@ -368,53 +407,90 @@ export default function Statistics() {
                 <h3 className="text-lg font-semibold mb-4">
                   {selectedProject !== 'all' ? `${selectedProject} 프로젝트 타임라인` : '전체 프로젝트 타임라인'}
                 </h3>
-                <h4 className="text-base font-medium mb-4">일별 활동</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={statistics.timeline.dailyActivity}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="sessionCount" stroke="#3b82f6" name="세션 수" />
-                    <Line type="monotone" dataKey="projectCount" stroke="#10b981" name="프로젝트 수" />
-                  </LineChart>
-                </ResponsiveContainer>
+                <h4 className="text-base font-medium mb-4">일별 활동 추이</h4>
+                <div className="bg-white rounded-xl p-4 border border-gray-200">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={statistics.timeline.dailyActivity}>
+                      <defs>
+                        <linearGradient id="colorSession" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                        </linearGradient>
+                        <linearGradient id="colorProject" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.1}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} fontSize={12} stroke="#9CA3AF" />
+                      <YAxis fontSize={12} stroke="#9CA3AF" />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                      <Area type="monotone" dataKey="sessionCount" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorSession)" name="세션 수" />
+                      <Area type="monotone" dataKey="projectCount" stroke="#8B5CF6" strokeWidth={2} fillOpacity={1} fill="url(#colorProject)" name="프로젝트 수" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-blue-900 mb-2">가장 활발한 날</h4>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {statistics.timeline.dailyActivity.reduce((max, day) => 
-                      day.sessionCount > (max?.sessionCount || 0) ? day : max, 
-                      statistics.timeline.dailyActivity[0]
-                    )?.date || 'N/A'}
-                  </p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    {statistics.timeline.dailyActivity.reduce((max, day) => 
-                      day.sessionCount > (max?.sessionCount || 0) ? day : max, 
-                      statistics.timeline.dailyActivity[0]
-                    )?.sessionCount || 0} 세션
-                  </p>
+                <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border border-blue-200">
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-blue-300 rounded-full blur-2xl opacity-20" />
+                  <div className="relative">
+                    <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      가장 활발한 날
+                    </h4>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {new Date(statistics.timeline.dailyActivity.reduce((max, day) => 
+                        day.sessionCount > (max?.sessionCount || 0) ? day : max, 
+                        statistics.timeline.dailyActivity[0]
+                      )?.date || '').toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) || 'N/A'}
+                    </p>
+                    <p className="text-sm text-blue-600 mt-2">
+                      {statistics.timeline.dailyActivity.reduce((max, day) => 
+                        day.sessionCount > (max?.sessionCount || 0) ? day : max, 
+                        statistics.timeline.dailyActivity[0]
+                      )?.sessionCount || 0} 세션 기록
+                    </p>
+                  </div>
                 </div>
 
-                <div className="bg-green-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-green-900 mb-2">평균 일일 세션</h4>
-                  <p className="text-2xl font-bold text-green-600">
-                    {statistics.timeline.dailyActivity.length > 0
-                      ? Math.round(statistics.totalSessions / statistics.timeline.dailyActivity.length)
-                      : 0}
-                  </p>
-                  <p className="text-sm text-green-700 mt-1">세션/일</p>
+                <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 border border-purple-200">
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-purple-300 rounded-full blur-2xl opacity-20" />
+                  <div className="relative">
+                    <h4 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      평균 일일 세션
+                    </h4>
+                    <p className="text-2xl font-bold text-purple-700">
+                      {statistics.timeline.dailyActivity.length > 0
+                        ? Math.round(statistics.totalSessions / statistics.timeline.dailyActivity.length)
+                        : 0}
+                    </p>
+                    <p className="text-sm text-purple-600 mt-2">세션/일</p>
+                  </div>
                 </div>
 
-                <div className="bg-purple-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-purple-900 mb-2">활동 기간</h4>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {statistics.timeline.dailyActivity.length}
-                  </p>
-                  <p className="text-sm text-purple-700 mt-1">일</p>
+                <div className="relative overflow-hidden bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-5 border border-pink-200">
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-pink-300 rounded-full blur-2xl opacity-20" />
+                  <div className="relative">
+                    <h4 className="font-semibold text-pink-900 mb-3 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      활동 기간
+                    </h4>
+                    <p className="text-2xl font-bold text-pink-700">
+                      {statistics.timeline.dailyActivity.length}
+                    </p>
+                    <p className="text-sm text-pink-600 mt-2">일간 활동</p>
+                  </div>
                 </div>
               </div>
             </div>

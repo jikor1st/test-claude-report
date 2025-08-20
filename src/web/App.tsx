@@ -1,77 +1,34 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { BarChart3, ChartBar, Home, Activity } from 'lucide-react';
-import ProjectList from './components/ProjectList';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
 import ProjectDetail from './components/ProjectDetail';
 import ReportViewer from './components/ReportViewer';
 import Statistics from './components/Statistics';
 import { AnalysisProvider } from './contexts/AnalysisContext';
-import ClaudeLogo from './components/ClaudeLogo';
-
-function Navigation() {
-  const location = useLocation();
-  
-  const navItems = [
-    { path: '/', label: '프로젝트', icon: Home },
-    { path: '/statistics', label: '통계', icon: ChartBar },
-  ];
-
-  return (
-    <nav className="flex gap-1 ml-auto">
-      {navItems.map(({ path, label, icon: Icon }) => {
-        const isActive = location.pathname === path || 
-                        (path === '/' && location.pathname.startsWith('/project'));
-        return (
-          <Link
-            key={path}
-            to={path}
-            className={`
-              flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
-              ${isActive 
-                ? 'bg-blue-100 text-blue-700 font-medium' 
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
-            `}
-          >
-            <Icon className="h-4 w-4" />
-            <span>{label}</span>
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
 
 function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <AnalysisProvider>
       <Router>
         <div className="min-h-screen bg-gray-50">
-          <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-            <div className="container mx-auto flex h-16 items-center px-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-                  <ClaudeLogo className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">
-                    Claude Report Analyzer
-                  </h1>
-                  <p className="text-xs text-muted-foreground">AI 대화 세션 분석 및 인사이트 도구</p>
-                </div>
-              </div>
-              <Navigation />
-            </div>
-          </header>
+          <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
           
-          <main className="container mx-auto px-4 py-8">
-            <Routes>
-              <Route path="/" element={<ProjectList />} />
-              <Route path="/statistics" element={<Statistics />} />
-              <Route path="/project/:id" element={<ProjectDetail />} />
-              <Route path="/project/:id/report/:date" element={<ReportViewer />} />
-            </Routes>
-          </main>
+          <div className="md:ml-64 transition-all duration-300">
+            <main className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+              <div className="container mx-auto px-4 xl:px-8">
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/statistics" element={<Statistics />} />
+                  <Route path="/project/:id" element={<ProjectDetail />} />
+                  <Route path="/project/:id/report/:date" element={<ReportViewer />} />
+                </Routes>
+              </div>
+            </main>
+          </div>
         </div>
       </Router>
       <Toaster 

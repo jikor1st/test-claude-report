@@ -18,7 +18,8 @@
       "Bash(grep:*)",
       "Bash(rm:*)",
       "Bash(npm run build:web:*)",
-      "Bash(npm run build:cli:*)"
+      "Bash(npm run build:cli:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": []
   }
