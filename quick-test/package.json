@@ -1,0 +1,13 @@
+{
+  "name": "quick-test",
+  "version": "1.0.0",
+  "description": "Claude Report Analyzer Project",
+  "scripts": {
+    "dashboard": "claude-report-analyzer dashboard",
+    "scan": "claude-report-analyzer scan",
+    "analyze": "claude-report-analyzer scan --project ."
+  },
+  "dependencies": {
+    "claude-report-analyzer": "latest"
+  }
+}
