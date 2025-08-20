@@ -90,3 +90,70 @@
     }
   }
 }
+
+/* 애니메이션 효과 */
+@keyframes tilt {
+  0%, 50%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(1deg);
+  }
+  75% {
+    transform: rotate(-1deg);
+  }
+}
+
+.animate-tilt {
+  animation: tilt 10s infinite linear;
+}
+
+/* 코드 블록 스타일 개선 */
+@layer components {
+  /* 코드 블록 헤더 호버 효과 */
+  .group:hover .code-header {
+    @apply bg-gradient-to-b from-gray-800 to-gray-700;
+  }
+  
+  /* 스크롤바 커스터마이징 */
+  .prose pre::-webkit-scrollbar,
+  .prose code::-webkit-scrollbar,
+  div[class*="language-"]::-webkit-scrollbar {
+    @apply h-2 w-2;
+  }
+  
+  .prose pre::-webkit-scrollbar-track,
+  .prose code::-webkit-scrollbar-track,
+  div[class*="language-"]::-webkit-scrollbar-track {
+    @apply bg-gray-800 rounded;
+  }
+  
+  .prose pre::-webkit-scrollbar-thumb,
+  .prose code::-webkit-scrollbar-thumb,
+  div[class*="language-"]::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded hover:bg-gray-500;
+  }
+  
+  /* 라인 넘버 스타일 */
+  .hljs-ln-numbers {
+    @apply text-gray-500 pr-4 select-none;
+  }
+  
+  /* 마크다운 테이블 개선 */
+  .prose table {
+    @apply shadow-sm border border-gray-200 rounded-lg overflow-hidden;
+  }
+  
+  .prose thead {
+    @apply bg-gray-50;
+  }
+  
+  .prose tbody tr {
+    @apply hover:bg-gray-50 transition-colors;
+  }
+  
+  /* 인라인 코드 개선 */
+  .prose :not(pre) > code {
+    @apply font-mono text-sm;
+  }
+}

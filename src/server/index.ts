@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import { homedir } from 'os';
 import { getClaudeProjectsPath, loadConfig } from '../cli/utils/config';
 import { scanProjects, loadProjectMetadata } from '../cli/utils/scanner';
 import { loadDailyReport } from '../cli/utils/analyzer';
-import type { Project, DailyReport, ProjectMetadata } from '../shared/types';
+import type { Project, DailyReport, ProjectMetadata, GlobalStatistics, SessionReport } from '../shared/types';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -249,6 +249,194 @@ app.get('/api/projects/:id/reports/:date', async (req, res) => {
   }
 });
 
+// Reanalyze session with specific template
+app.post('/api/projects/:id/sessions/:sessionId/reanalyze', async (req, res) => {
+  try {
+    const { id, sessionId } = req.params;
+    const { templateType } = req.body;
+    const decodedId = decodeURIComponent(id);
+    const decodedSessionId = decodeURIComponent(sessionId);
+    
+    console.log(`[REANALYZE API] Request for project: ${decodedId}, session: ${decodedSessionId}, template: ${templateType}`);
+    
+    const claudeProjectsPath = await getClaudeProjectsPath();
+    const projectPath = join(claudeProjectsPath, decodedId);
+    
+    // Find session file
+    const { findSessionFiles, parseSessionFile } = await import('../cli/utils/sessionAnalyzer');
+    const sessionFiles = await findSessionFiles(projectPath);
+    
+    // Find the specific session file
+    let targetFile: string | null = null;
+    for (const filePath of sessionFiles) {
+      const fileName = basename(filePath);
+      if (fileName === decodedSessionId || fileName.includes(decodedSessionId)) {
+        targetFile = filePath;
+        break;
+      }
+    }
+    
+    if (!targetFile) {
+      return res.status(404).json({ error: 'Session file not found' });
+    }
+    
+    // Parse session file
+    const session = await parseSessionFile(targetFile);
+    if (!session) {
+      return res.status(500).json({ error: 'Failed to parse session file' });
+    }
+    
+    // Perform AI analysis with specific template
+    const { analyzeWithClaudeCode } = await import('../cli/utils/claudeApi');
+    const { loadMdTemplate, fillMdTemplate } = await import('../cli/utils/templates/mdTemplates');
+    
+    // Override template type if specified
+    if (templateType) {
+      console.log(`[REANALYZE API] Using specified template: ${templateType}`);
+    }
+    
+    const analysisResult = await analyzeWithClaudeCode(session);
+    
+    if (analysisResult) {
+      // Load and apply MD template
+      const selectedTemplate = templateType || analysisResult.templateType;
+      const mdTemplate = await loadMdTemplate(selectedTemplate);
+      const mdxContent = fillMdTemplate(mdTemplate, analysisResult.analysis, session);
+      
+      // Update the report
+      const projectReportDir = join(process.cwd(), 'reports', 'projects', decodedId);
+      const date = new Date(session.created).toISOString().split('T')[0];
+      const reportPath = join(projectReportDir, 'reports', `${date}.json`);
+      
+      // Load existing report
+      let dailyReport: DailyReport = { 
+        date, 
+        sessions: [],
+        totalSessions: 0,
+        summary: ''
+      };
+      try {
+        const existingReport = await fs.readFile(reportPath, 'utf8');
+        dailyReport = JSON.parse(existingReport);
+      } catch {
+        // Report doesn't exist yet
+      }
+      
+      // Update or add session report
+      const sessionIndex = dailyReport.sessions.findIndex(s => s.sessionId === session.id);
+      const newSessionReport: SessionReport = {
+        sessionId: session.id,
+        date,
+        title: analysisResult.analysis.title,
+        summary: analysisResult.analysis.summary,
+        mdxContent,
+        keyTopics: [
+          ...(analysisResult.analysis.technicalDetails?.languages || []), 
+          ...(analysisResult.analysis.technicalDetails?.frameworks || [])
+        ],
+        codeChanges: {
+          filesModified: [],
+          linesAdded: 0,
+          linesRemoved: 0
+        },
+        duration: '알 수 없음',
+        status: 'completed' as const,
+        aiInsights: {
+          keyInsights: analysisResult.analysis.keyInsights,
+          codeQuality: analysisResult.analysis.codeQuality || { strengths: [], improvements: [] },
+          timeline: analysisResult.analysis.timeline || { mainTasks: [], completedGoals: [], challenges: [] }
+        }
+      };
+      
+      if (sessionIndex >= 0) {
+        dailyReport.sessions[sessionIndex] = newSessionReport;
+      } else {
+        dailyReport.sessions.push(newSessionReport);
+      }
+      
+      // Save updated report
+      await fs.mkdir(join(projectReportDir, 'reports'), { recursive: true });
+      await fs.writeFile(reportPath, JSON.stringify(dailyReport, null, 2));
+      
+      res.json({
+        success: true,
+        message: '재분석이 완료되었습니다.',
+        templateUsed: selectedTemplate,
+        report: newSessionReport
+      });
+    } else {
+      res.status(500).json({ error: 'AI 분석에 실패했습니다.' });
+    }
+  } catch (error) {
+    console.error('Reanalysis error:', error);
+    res.status(500).json({ error: '재분석 중 오류가 발생했습니다.' });
+  }
+});
+
+// Get original session data
+app.get('/api/projects/:id/sessions/:sessionId/raw', async (req, res) => {
+  try {
+    const { id, sessionId } = req.params;
+    const decodedId = decodeURIComponent(id);
+    const decodedSessionId = decodeURIComponent(sessionId);
+    
+    console.log(`[RAW DATA API] Request for project: ${decodedId}, session: ${decodedSessionId}`);
+    
+    const claudeProjectsPath = await getClaudeProjectsPath();
+    const projectPath = join(claudeProjectsPath, decodedId);
+    
+    console.log(`[RAW DATA API] Project path: ${projectPath}`);
+    
+    // Find session file
+    const { findSessionFiles, parseSessionFile } = await import('../cli/utils/sessionAnalyzer');
+    const sessionFiles = await findSessionFiles(projectPath);
+    
+    console.log(`[RAW DATA API] Found ${sessionFiles.length} session files`);
+    
+    // Find the specific session file
+    let targetFile: string | null = null;
+    for (const filePath of sessionFiles) {
+      const fileName = basename(filePath);
+      console.log(`[RAW DATA API] Checking file: ${fileName} against sessionId: ${decodedSessionId}`);
+      if (fileName === decodedSessionId || fileName.includes(decodedSessionId)) {
+        targetFile = filePath;
+        console.log(`[RAW DATA API] Found matching file: ${targetFile}`);
+        break;
+      }
+    }
+    
+    if (!targetFile) {
+      console.log(`[RAW DATA API] No matching file found for sessionId: ${decodedSessionId}`);
+      console.log(`[RAW DATA API] Available files:`, sessionFiles.map(f => basename(f)));
+      return res.status(404).json({ 
+        error: 'Session file not found',
+        sessionId: decodedSessionId,
+        availableFiles: sessionFiles.map(f => basename(f))
+      });
+    }
+    
+    // Parse session file to get raw conversation data
+    const session = await parseSessionFile(targetFile);
+    if (!session) {
+      console.log(`[RAW DATA API] Failed to parse session file: ${targetFile}`);
+      return res.status(500).json({ error: 'Failed to parse session file' });
+    }
+    
+    console.log(`[RAW DATA API] Successfully parsed session with ${session.messages.length} messages`);
+    
+    res.json({
+      sessionId: session.id,
+      name: session.name,
+      created: session.created,
+      updated: session.updated,
+      messages: session.messages
+    });
+  } catch (error) {
+    console.error('[RAW DATA API] Error fetching raw session data:', error);
+    res.status(500).json({ error: 'Failed to fetch session data' });
+  }
+});
+
 // Get analysis status
 app.get('/api/projects/:id/status', (req, res) => {
   const { id } = req.params;
@@ -346,10 +534,15 @@ app.post('/api/projects/:id/analyze-by-date', async (req, res) => {
     const analyzedSet = new Set(metadata.analyzedSessions || []);
     const dateSessionFiles: string[] = [];
     
-    // Filter sessions by date
+    // Filter sessions by date - check both analyzedSessions and existing report
+    const { loadDailyReport } = await import('../cli/utils/analyzer');
+    const existingReport = await loadDailyReport(projectReportDir, date);
+    const existingSessionIds = new Set(existingReport?.sessions.map(s => s.sessionId) || []);
+    
     for (const filePath of sessionFiles) {
       const sessionId = filePath.split('/').pop() || '';
-      if (!analyzedSet.has(sessionId)) {
+      // Skip if already analyzed or exists in report
+      if (!analyzedSet.has(sessionId) && !existingSessionIds.has(sessionId)) {
         const session = await parseSessionFile(filePath);
         if (session) {
           const sessionDate = new Date(session.created).toISOString().split('T')[0];
@@ -651,6 +844,293 @@ useAI: ${useAI}, limit: ${limit}
     });
     
     res.status(500).json({ error: '분석 중 오류가 발생했습니다' });
+  }
+});
+
+// Get global statistics from all projects
+app.get('/api/statistics', async (req, res) => {
+  try {
+    const { projectId } = req.query;
+    const reportsDir = join(process.cwd(), 'reports', 'projects');
+    
+    // Check if reports directory exists
+    const dirExists = await fs.access(reportsDir).then(() => true).catch(() => false);
+    if (!dirExists) {
+      return res.json({
+        totalProjects: 0,
+        totalSessions: 0,
+        totalReports: 0,
+        dateRange: { start: '', end: '' },
+        technicalStack: { languages: [], frameworks: [], tools: [] },
+        codeQuality: { totalStrengths: [], totalImprovements: [] },
+        taskAnalysis: { mainTasks: [], completedGoals: [], challenges: [] },
+        insights: { topInsights: [], commonPatterns: [] },
+        timeline: { dailyActivity: [], weeklyActivity: [] }
+      });
+    }
+
+    // Get all project directories
+    const allProjectDirs = await fs.readdir(reportsDir);
+    const validProjectDirs: string[] = [];
+    for (const dir of allProjectDirs) {
+      const stats = await fs.stat(join(reportsDir, dir));
+      if (stats.isDirectory()) {
+        validProjectDirs.push(dir);
+      }
+    }
+    
+    // Filter projects if projectId is specified
+    let projectDirs = validProjectDirs;
+    if (projectId && typeof projectId === 'string') {
+      const decodedProjectId = decodeURIComponent(projectId);
+      projectDirs = projectDirs.filter(dir => dir === decodedProjectId);
+    }
+    
+    const statistics: GlobalStatistics = {
+      totalProjects: 0,
+      totalSessions: 0,
+      totalReports: 0,
+      projectList: validProjectDirs,
+      selectedProject: projectId as string | undefined,
+      dateRange: { start: '', end: '' },
+      keyTopics: [],
+      codeQuality: {
+        totalStrengths: [],
+        totalImprovements: []
+      },
+      taskAnalysis: {
+        mainTasks: [],
+        issues: [],
+        commonSolutions: []
+      },
+      insights: {
+        topInsights: [],
+        commonPatterns: []
+      },
+      timeline: {
+        dailyActivity: [],
+        weeklyActivity: []
+      }
+    };
+
+    // Collect data from all projects
+    const topicCount = new Map<string, { count: number; projects: Set<string> }>();
+    const strengthCount = new Map<string, number>();
+    const improvementCount = new Map<string, number>();
+    const taskCount = new Map<string, { count: number; projects: Set<string> }>();
+    const issueMap = new Map<string, { count: number; projects: Set<string>; solutions: Map<string, number> }>();
+    const solutionMap = new Map<string, { count: number; issues: Set<string> }>();
+    const insightCount = new Map<string, { frequency: number; projects: Set<string> }>();
+    const dailyActivityMap = new Map<string, { sessionCount: number; projectSet: Set<string> }>();
+    
+    let earliestDate = '';
+    let latestDate = '';
+
+    for (const projectDir of projectDirs) {
+      const projectPath = join(reportsDir, projectDir);
+      const stats = await fs.stat(projectPath);
+      
+      if (!stats.isDirectory()) continue;
+      
+      statistics.totalProjects++;
+      
+      // Load project metadata
+      const metadata = await loadProjectMetadata(projectPath);
+      if (!metadata) continue;
+      
+      // Load all reports for this project
+      const reportsPath = join(projectPath, 'reports');
+      const reportExists = await fs.access(reportsPath).then(() => true).catch(() => false);
+      
+      if (reportExists) {
+        const reportFiles = await fs.readdir(reportsPath);
+        const jsonReports = reportFiles.filter(f => f.endsWith('.json'));
+        
+        for (const reportFile of jsonReports) {
+          const date = reportFile.replace('.json', '');
+          const report = await loadDailyReport(projectPath, date);
+          
+          if (report) {
+            statistics.totalReports++;
+            statistics.totalSessions += report.sessions.length;
+            
+            // Update date range
+            if (!earliestDate || date < earliestDate) earliestDate = date;
+            if (!latestDate || date > latestDate) latestDate = date;
+            
+            // Update daily activity
+            const activity = dailyActivityMap.get(date) || { sessionCount: 0, projectSet: new Set() };
+            activity.sessionCount += report.sessions.length;
+            activity.projectSet.add(projectDir);
+            dailyActivityMap.set(date, activity);
+            
+            // Process each session
+            for (const session of report.sessions) {
+              // Extract key topics from session
+              if (session.keyTopics && Array.isArray(session.keyTopics)) {
+                for (const topic of session.keyTopics) {
+                  const existing = topicCount.get(topic) || { count: 0, projects: new Set() };
+                  existing.count++;
+                  existing.projects.add(projectDir);
+                  topicCount.set(topic, existing);
+                }
+              }
+              
+              if (session.aiInsights) {
+                
+                // Code quality
+                if (session.aiInsights.codeQuality) {
+                  session.aiInsights.codeQuality.strengths.forEach(strength => {
+                    strengthCount.set(strength, (strengthCount.get(strength) || 0) + 1);
+                  });
+                  session.aiInsights.codeQuality.improvements.forEach(improvement => {
+                    improvementCount.set(improvement, (improvementCount.get(improvement) || 0) + 1);
+                  });
+                }
+                
+                // Tasks and Issues/Solutions
+                if (session.aiInsights.timeline) {
+                  // Main tasks
+                  session.aiInsights.timeline.mainTasks.forEach(task => {
+                    const existing = taskCount.get(task) || { count: 0, projects: new Set() };
+                    existing.count++;
+                    existing.projects.add(projectDir);
+                    taskCount.set(task, existing);
+                  });
+                  
+                  // Extract issues and solutions from challenges and completed goals
+                  // Challenges are treated as issues
+                  if (session.aiInsights?.timeline?.challenges) {
+                    session.aiInsights.timeline.challenges.forEach(challenge => {
+                      const existing = issueMap.get(challenge) || { 
+                        count: 0, 
+                        projects: new Set(), 
+                        solutions: new Map() 
+                      };
+                      existing.count++;
+                      existing.projects.add(projectDir);
+                      
+                      // Try to find related solutions from completed goals
+                      if (session.aiInsights?.timeline?.completedGoals) {
+                        session.aiInsights.timeline.completedGoals.forEach(goal => {
+                          existing.solutions.set(goal, (existing.solutions.get(goal) || 0) + 1);
+                          
+                          // Track solution globally
+                          const solExisting = solutionMap.get(goal) || { count: 0, issues: new Set() };
+                          solExisting.count++;
+                          solExisting.issues.add(challenge);
+                          solutionMap.set(goal, solExisting);
+                        });
+                      }
+                      
+                      issueMap.set(challenge, existing);
+                    });
+                  }
+                }
+                
+                // Insights
+                if (session.aiInsights.keyInsights) {
+                  session.aiInsights.keyInsights.forEach(insight => {
+                    const existing = insightCount.get(insight) || { frequency: 0, projects: new Set() };
+                    existing.frequency++;
+                    existing.projects.add(projectDir);
+                    insightCount.set(insight, existing);
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Calculate percentages and format results
+    const totalTopicRefs = Array.from(topicCount.values()).reduce((a, b) => a.count + b.count, 0);
+    
+    statistics.dateRange = { start: earliestDate, end: latestDate };
+    
+    // Sort and format key topics
+    statistics.keyTopics = Array.from(topicCount.entries())
+      .map(([topic, data]) => ({
+        topic,
+        count: data.count,
+        percentage: totalTopicRefs > 0 ? Math.round((data.count / totalTopicRefs) * 100) : 0,
+        projects: Array.from(data.projects)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+    
+    // Code quality top items
+    statistics.codeQuality.totalStrengths = Array.from(strengthCount.entries())
+      .map(([description, count]) => ({ description, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    
+    statistics.codeQuality.totalImprovements = Array.from(improvementCount.entries())
+      .map(([description, count]) => ({ description, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    
+    // Task analysis
+    statistics.taskAnalysis.mainTasks = Array.from(taskCount.entries())
+      .map(([task, data]) => ({
+        task,
+        count: data.count,
+        projects: Array.from(data.projects)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
+    
+    // Issues and their solutions
+    statistics.taskAnalysis.issues = Array.from(issueMap.entries())
+      .map(([issue, data]) => ({
+        issue,
+        count: data.count,
+        projects: Array.from(data.projects),
+        solutions: Array.from(data.solutions.entries())
+          .map(([solution, frequency]) => ({ solution, frequency }))
+          .sort((a, b) => b.frequency - a.frequency)
+          .slice(0, 3)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    
+    // Common solutions
+    statistics.taskAnalysis.commonSolutions = Array.from(solutionMap.entries())
+      .map(([solution, data]) => ({
+        solution,
+        count: data.count,
+        relatedIssues: Array.from(data.issues).slice(0, 3)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    
+    // Insights
+    statistics.insights.topInsights = Array.from(insightCount.entries())
+      .map(([insight, data]) => ({
+        insight,
+        frequency: data.frequency,
+        projects: Array.from(data.projects)
+      }))
+      .sort((a, b) => b.frequency - a.frequency)
+      .slice(0, 10);
+    
+    // Timeline
+    statistics.timeline.dailyActivity = Array.from(dailyActivityMap.entries())
+      .map(([date, data]) => ({
+        date,
+        sessionCount: data.sessionCount,
+        projectCount: data.projectSet.size
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    
+    // Ensure projectList is included
+    statistics.projectList = validProjectDirs;
+    
+    res.json(statistics);
+  } catch (error) {
+    console.error('Error generating statistics:', error);
+    res.status(500).json({ error: 'Failed to generate statistics' });
   }
 });
 

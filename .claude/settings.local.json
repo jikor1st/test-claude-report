@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp:*)",
+      "Bash(npm install:*)",
+      "Bash(mkdir:*)",
+      "Bash(claude doctor)",
+      "Bash(npx tsx:*)",
+      "Bash(npm run claude-report scan:*)",
+      "Bash(CLAUDE_PROJECTS_PATH=\"$(pwd)/test-mini-project\" npm run claude-report scan -- --project test-mini-project --limit 1)",
+      "Bash(ls:*)",
+      "Bash(CLAUDE_PROJECTS_PATH=\"./tests\" npm run claude-report scan -- --project test-mini-project --limit 1)",
+      "Bash(CLAUDE_PROJECTS_PATH=\"./tests\" npm run claude-report scan -- --project test-bug-fix --limit 1)",
+      "Bash(mv:*)",
+      "Bash(CLAUDE_PROJECTS_PATH=\"$(pwd)/tests\" npm run claude-report scan -- --project test-bug-fix --limit 1)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(grep:*)",
+      "Bash(rm:*)",
+      "Bash(npm run build:web:*)",
+      "Bash(npm run build:cli:*)",
+      "Bash(npm run dev:*)"
+    ],
+    "deny": []
+  }
+}

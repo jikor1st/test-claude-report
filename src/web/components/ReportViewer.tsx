@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Code2, FileText, Tag, CheckCircle, AlertCircle, Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCheck, Download, FileDown, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Code2, FileText, Tag, CheckCircle, AlertCircle, Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCheck, ToggleLeft, ToggleRight, Download, FileDown, ChevronDown, RefreshCw, User, Folder, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -10,6 +10,46 @@ import { api } from '../utils/api';
 import { cn } from '../lib/utils';
 import { generateMarkdownFromReport, downloadMarkdown } from '../utils/exportUtils';
 import { generatePDFFromReport } from '../utils/pdfExportUtils';
+import toast from 'react-hot-toast';
+
+interface RawSessionData {
+  sessionId: string;
+  name: string;
+  created: string;
+  updated: string;
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp?: string;
+  }>;
+}
+
+type TemplateType = 
+  | 'bug-fix'
+  | 'feature-dev'
+  | 'code-review'
+  | 'refactoring'
+  | 'documentation'
+  | 'debugging'
+  | 'architecture'
+  | 'performance'
+  | 'testing'
+  | 'learning'
+  | 'general';
+
+const templateOptions: { value: TemplateType; label: string; description: string }[] = [
+  { value: 'bug-fix', label: '버그 수정', description: '버그 발견부터 해결까지의 과정' },
+  { value: 'feature-dev', label: '기능 개발', description: '새로운 기능의 설계부터 구현까지' },
+  { value: 'code-review', label: '코드 리뷰', description: '코드 품질 검토 및 개선 제안' },
+  { value: 'refactoring', label: '리팩토링', description: '코드 구조 개선 과정과 결과' },
+  { value: 'documentation', label: '문서화', description: '문서 작성 및 개선 활동' },
+  { value: 'debugging', label: '디버깅', description: '문제 진단 및 해결 과정' },
+  { value: 'architecture', label: '아키텍처 설계', description: '시스템 설계 및 구조 결정' },
+  { value: 'performance', label: '성능 최적화', description: '성능 분석 및 개선 활동' },
+  { value: 'testing', label: '테스트', description: '테스트 작성 및 실행 결과' },
+  { value: 'learning', label: '학습', description: '학습 내용 및 질문 응답' },
+  { value: 'general', label: '일반', description: '특정 카테고리에 속하지 않는 대화' }
+];
 
 const ReportViewer: React.FC = () => {
   const { id, date } = useParams<{ id: string; date: string }>();
@@ -18,14 +58,78 @@ const ReportViewer: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<SessionReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
+  const [showRawData, setShowRawData] = useState(false);
+  const [rawData, setRawData] = useState<RawSessionData | null>(null);
+  const [loadingRawData, setLoadingRawData] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [showTemplateSelect, setShowTemplateSelect] = useState(false);
+  const templateSelectRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (id && date) {
       loadReport(id, date);
     }
   }, [id, date]);
+
+  useEffect(() => {
+    if (showRawData && !rawData && selectedSession && id) {
+      fetchRawData();
+    }
+  }, [showRawData, selectedSession]);
+
+  // 외부 클릭 감지를 위한 이벤트 리스너
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // 템플릿 선택 popover 외부 클릭 감지
+      if (templateSelectRef.current && !templateSelectRef.current.contains(event.target as Node)) {
+        // 재분석 버튼 클릭은 제외 (토글 동작을 위해)
+        const isReanalyzeButton = (event.target as HTMLElement).closest('[data-reanalyze-button]');
+        if (!isReanalyzeButton) {
+          setShowTemplateSelect(false);
+        }
+      }
+      
+      // 내보내기 메뉴 외부 클릭 감지
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        // 내보내기 버튼 클릭은 제외
+        const isExportButton = (event.target as HTMLElement).closest('[data-export-button]');
+        if (!isExportButton) {
+          setShowExportMenu(false);
+        }
+      }
+    };
+
+    // 이벤트 리스너 등록
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // 컴포넌트 언마운트 시 이벤트 리스너 제거
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTemplateSelect, showExportMenu]);
+
+  const fetchRawData = async () => {
+    if (!selectedSession || !id) return;
+    
+    setLoadingRawData(true);
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(id)}/sessions/${encodeURIComponent(selectedSession.sessionId)}/raw`);
+      
+      if (!response.ok) {
+        throw new Error('원본 데이터를 가져오는데 실패했습니다');
+      }
+
+      const data = await response.json();
+      setRawData(data);
+    } catch (err) {
+      console.error('Error fetching raw data:', err);
+    } finally {
+      setLoadingRawData(false);
+    }
+  };
 
   const handleExportMarkdown = (all: boolean) => {
     if (!report) return;
@@ -60,16 +164,75 @@ const ReportViewer: React.FC = () => {
     }
   };
 
+  const handleReanalyze = async (templateType?: TemplateType) => {
+    if (!selectedSession || !id) return;
+    
+    setReanalyzing(true);
+    setShowTemplateSelect(false);
+    
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(id)}/sessions/${encodeURIComponent(selectedSession.sessionId)}/reanalyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ templateType })
+      });
+      
+      if (!response.ok) {
+        throw new Error('재분석에 실패했습니다');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success('재분석이 완료되었습니다!');
+        
+        // 리포트를 다시 로드하여 업데이트된 내용을 표시
+        if (date) {
+          await loadReport(id, date);
+        }
+      } else {
+        throw new Error(result.error || '재분석에 실패했습니다');
+      }
+    } catch (err) {
+      console.error('재분석 오류:', err);
+      toast.error(err instanceof Error ? err.message : '재분석 중 오류가 발생했습니다');
+    } finally {
+      setReanalyzing(false);
+    }
+  };
+
   const loadReport = async (projectId: string, reportDate: string) => {
     try {
       setLoading(true);
       setError(null);
       const data = await api.getReport(projectId, reportDate);
-      setReport(data);
-      if (data.sessions.length > 0) {
-        setSelectedSession(data.sessions[0]);
+      
+      // 중복 세션 제거 - 동일한 sessionId가 여러 개 있으면 마지막 것만 유지
+      const uniqueSessions = data.sessions.reduce((acc, session) => {
+        const existingIndex = acc.findIndex(s => s.sessionId === session.sessionId);
+        if (existingIndex >= 0) {
+          // 기존 세션을 새 세션으로 교체 (재분석된 최신 버전 유지)
+          acc[existingIndex] = session;
+        } else {
+          acc.push(session);
+        }
+        return acc;
+      }, [] as SessionReport[]);
+      
+      // 중복 제거된 데이터로 업데이트
+      const cleanedData = {
+        ...data,
+        sessions: uniqueSessions,
+        totalSessions: uniqueSessions.length
+      };
+      
+      setReport(cleanedData);
+      if (uniqueSessions.length > 0) {
+        setSelectedSession(uniqueSessions[0]);
         // 첫 번째 세션은 기본적으로 확장
-        setExpandedSessions(new Set([data.sessions[0].sessionId]));
+        setExpandedSessions(new Set([uniqueSessions[0].sessionId]));
       }
     } catch (error) {
       console.error('Error loading report:', error);
@@ -125,7 +288,7 @@ const ReportViewer: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-8">
       <div>
         <Link to={`/project/${id}`} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
           <ArrowLeft className="h-4 w-4" />
@@ -149,6 +312,7 @@ const ReportViewer: React.FC = () => {
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 disabled={exporting}
+                data-export-button
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 {exporting ? (
@@ -161,7 +325,7 @@ const ReportViewer: React.FC = () => {
               </button>
               
               {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-white border border-gray-200 z-10">
+                <div ref={exportMenuRef} className="absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-white border border-gray-200 z-10">
                   <div className="py-1">
                     <div className="px-4 py-2 text-xs text-gray-500 font-semibold uppercase">현재 세션</div>
                     <button
@@ -217,7 +381,11 @@ const ReportViewer: React.FC = () => {
               {report.sessions.map((session) => (
                 <button
                   key={session.sessionId}
-                  onClick={() => setSelectedSession(session)}
+                  onClick={() => {
+                    setSelectedSession(session);
+                    setRawData(null);
+                    setShowRawData(false);
+                  }}
                   className={cn(
                     "w-full text-left px-4 py-3 border-b transition-colors",
                     "hover:bg-accent/50",
@@ -272,9 +440,70 @@ const ReportViewer: React.FC = () => {
               {/* AI Insights 섹션 - 메인 섹션으로 이동 */}
               {selectedSession.aiInsights && (
                 <div className="px-6 py-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Sparkles className="h-5 w-5 text-yellow-500" />
-                    <h3 className="text-lg font-semibold">AI 분석 결과</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-yellow-500" />
+                      <h3 className="text-lg font-semibold">AI 분석 결과</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowTemplateSelect(!showTemplateSelect)}
+                          disabled={reanalyzing}
+                          data-reanalyze-button
+                          className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                        >
+                          {reanalyzing ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              재분석 중...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4" />
+                              재분석
+                            </>
+                          )}
+                        </button>
+                        
+                        {showTemplateSelect && !reanalyzing && (
+                          <div ref={templateSelectRef} className="absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white border border-gray-200 z-10 max-h-96 overflow-y-auto">
+                            <div className="p-4">
+                              <h4 className="text-sm font-semibold mb-3">템플릿 선택</h4>
+                              <p className="text-xs text-gray-500 mb-3">분석에 사용할 템플릿을 선택하세요</p>
+                              <div className="space-y-2">
+                                {templateOptions.map((template) => (
+                                  <button
+                                    key={template.value}
+                                    onClick={() => handleReanalyze(template.value)}
+                                    className="w-full text-left p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <div className="font-medium text-sm">{template.label}</div>
+                                    <div className="text-xs text-gray-500 mt-1">{template.description}</div>
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="mt-3 pt-3 border-t">
+                                <button
+                                  onClick={() => handleReanalyze()}
+                                  className="w-full text-center p-2 rounded-md bg-primary text-white hover:bg-primary/90 transition-colors text-sm"
+                                >
+                                  자동 템플릿 선택
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={() => setShowRawData(!showRawData)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                      >
+                        {showRawData ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                        {showRawData ? 'AI 분석 보기' : '원본 대화 보기'}
+                      </button>
+                    </div>
                   </div>
                   
                   {/* 주요 인사이트 */}
@@ -371,59 +600,341 @@ const ReportViewer: React.FC = () => {
               )}
 
               <div className="px-6 py-6 border-t">
-                <h3 className="text-lg font-semibold mb-4">상세 내용</h3>
-                <div className="rounded-lg bg-gray-50 p-6">
-                  <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-muted-foreground prose-pre:bg-slate-950 prose-pre:text-slate-50">
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        code({ node, inline, className, children, ...props }) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              style={vscDarkPlus}
-                              language={match[1]}
-                              PreTag="div"
-                              className="rounded-md text-sm"
-                              {...props}
-                            >
-                              {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                          ) : (
-                            <code className={`${className} bg-slate-100 px-1 py-0.5 rounded text-sm`} {...props}>
-                              {children}
-                            </code>
-                          );
-                        },
-                        h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
-                        h2: ({ children }) => <h2 className="text-xl font-semibold mt-5 mb-3">{children}</h2>,
-                        h3: ({ children }) => <h3 className="text-lg font-medium mt-4 mb-2">{children}</h3>,
-                        ul: ({ children }) => <ul className="list-disc pl-6 my-3 space-y-1">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal pl-6 my-3 space-y-1">{children}</ol>,
-                        li: ({ children }) => <li className="text-muted-foreground">{children}</li>,
-                        p: ({ children }) => <p className="my-3 leading-relaxed">{children}</p>,
-                        blockquote: ({ children }) => (
-                          <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4 text-muted-foreground">
-                            {children}
-                          </blockquote>
-                        ),
-                        table: ({ children }) => (
-                          <div className="overflow-x-auto my-4">
-                            <table className="min-w-full divide-y divide-border">{children}</table>
+                <h3 className="text-lg font-semibold mb-4">{showRawData ? '원본 대화 내용' : '상세 내용'}</h3>
+                
+                {/* 원본 데이터 표시 */}
+                {showRawData ? (
+                  <div className="rounded-lg bg-gray-50 p-6">
+                    {loadingRawData ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        <span className="ml-2 text-muted-foreground">원본 데이터 로딩 중...</span>
+                      </div>
+                    ) : rawData ? (
+                      <div className="space-y-4 max-h-[800px] overflow-y-auto">
+                        {rawData.messages.map((message, index) => (
+                          <div 
+                            key={index} 
+                            className={cn(
+                              "p-4 rounded-lg",
+                              message.role === 'user' 
+                                ? 'bg-blue-50 border border-blue-200' 
+                                : 'bg-white border border-gray-200'
+                            )}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={cn(
+                                "font-semibold",
+                                message.role === 'user' ? 'text-blue-700' : 'text-green-700'
+                              )}>
+                                {message.role === 'user' ? '💬 사용자' : '🤖 Claude'}
+                              </span>
+                              {message.timestamp && (
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(message.timestamp).toLocaleString('ko-KR')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm break-words overflow-wrap-anywhere">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({ children }) => <p className="whitespace-pre-wrap break-words">{children}</p>,
+                                  code({ node, inline, className, children, ...props }) {
+                                    const match = /language-(\w+)/.exec(className || '');
+                                    const [copied, setCopied] = useState(false);
+                                    
+                                    const handleCopy = () => {
+                                      navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+                                      setCopied(true);
+                                      setTimeout(() => setCopied(false), 2000);
+                                    };
+                                    
+                                    return !inline && match ? (
+                                      <div className="relative group my-3">
+                                        <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-gray-800 to-gray-700 rounded-t-md flex items-center justify-between px-3">
+                                          <span className="text-xs font-medium text-gray-300">{match[1]}</span>
+                                          <button
+                                            onClick={handleCopy}
+                                            className="flex items-center gap-1 text-xs text-gray-300 hover:text-white transition-colors"
+                                          >
+                                            {copied ? (
+                                              <>
+                                                <Check className="w-3 h-3" />
+                                                복사됨
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Copy className="w-3 h-3" />
+                                                복사
+                                              </>
+                                            )}
+                                          </button>
+                                        </div>
+                                        <SyntaxHighlighter
+                                          style={vscDarkPlus}
+                                          language={match[1]}
+                                          PreTag="div"
+                                          showLineNumbers={true}
+                                          customStyle={{
+                                            margin: 0,
+                                            paddingTop: '2.5rem',
+                                            paddingBottom: '1rem',
+                                            paddingLeft: '1rem',
+                                            paddingRight: '1rem',
+                                            fontSize: '0.75rem',
+                                            lineHeight: '1.6',
+                                            backgroundColor: '#1e1e1e',
+                                            borderRadius: '0.375rem'
+                                          }}
+                                        >
+                                          {String(children).replace(/\n$/, '')}
+                                        </SyntaxHighlighter>
+                                      </div>
+                                    ) : (
+                                      <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                                    );
+                                  }
+                                }}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
+                            </div>
                           </div>
-                        ),
-                        th: ({ children }) => (
-                          <th className="px-4 py-2 text-left text-sm font-medium bg-muted">{children}</th>
-                        ),
-                        td: ({ children }) => (
-                          <td className="px-4 py-2 text-sm border-t">{children}</td>
-                        ),
-                      }}
-                    >
-                      {selectedSession.mdxContent}
-                    </ReactMarkdown>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        원본 데이터를 불러올 수 없습니다.
+                      </div>
+                    )}
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-6">
+                    
+                    {/* Frontmatter 정보 표시 */}
+                    {(() => {
+                      const content = selectedSession.mdxContent;
+                      // frontmatter가 한 줄로 되어있는 경우도 처리
+                      let frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+                      
+                      // 만약 줄바꿈이 없는 frontmatter라면 (한 줄로 된 경우)
+                      if (!frontmatterMatch) {
+                        // title: "..." date: ... 패턴을 찾아서 줄바꿈 추가
+                        const oneLinerMatch = content.match(/^---\s*(title:.*?)---/);
+                        if (oneLinerMatch) {
+                          // 각 속성을 찾아서 줄바꿈 추가
+                          const frontmatterLine = oneLinerMatch[1];
+                          const formattedFrontmatter = frontmatterLine
+                            .replace(/\s+(title:|date:|tags:|category:|author:|description:)/g, '\n$1')
+                            .trim();
+                          
+                          // 수정된 content로 다시 매칭
+                          const fixedContent = content.replace(oneLinerMatch[0], `---\n${formattedFrontmatter}\n---`);
+                          frontmatterMatch = fixedContent.match(/^---\n([\s\S]*?)\n---/);
+                          
+                          // mdxContent도 업데이트 (UI에 반영)
+                          selectedSession.mdxContent = fixedContent;
+                        }
+                      }
+                      
+                      if (frontmatterMatch) {
+                        // frontmatter 파싱
+                        const frontmatterData: Record<string, string> = {};
+                        const lines = frontmatterMatch[1].split('\n');
+                        lines.forEach(line => {
+                          const colonIndex = line.indexOf(':');
+                          if (colonIndex > -1) {
+                            const key = line.slice(0, colonIndex).trim();
+                            const value = line.slice(colonIndex + 1).trim().replace(/^["']|["']$/g, '');
+                            frontmatterData[key] = value;
+                          }
+                        });
+                        
+                        return (
+                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-100">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-blue-600" />
+                              문서 정보
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {frontmatterData.title && (
+                                <div className="space-y-1">
+                                  <div className="text-sm text-gray-600">제목</div>
+                                  <div className="font-medium text-gray-900">{frontmatterData.title}</div>
+                                </div>
+                              )}
+                              {frontmatterData.date && (
+                                <div className="space-y-1">
+                                  <div className="text-sm text-gray-600">날짜</div>
+                                  <div className="font-medium text-gray-900">{frontmatterData.date}</div>
+                                </div>
+                              )}
+                              {frontmatterData.category && (
+                                <div className="space-y-1">
+                                  <div className="text-sm text-gray-600">카테고리</div>
+                                  <div className="font-medium text-gray-900">{frontmatterData.category}</div>
+                                </div>
+                              )}
+                              {frontmatterData.author && (
+                                <div className="space-y-1">
+                                  <div className="text-sm text-gray-600">작성자</div>
+                                  <div className="font-medium text-gray-900">{frontmatterData.author}</div>
+                                </div>
+                              )}
+                              {frontmatterData.tags && (
+                                <div className="md:col-span-2 space-y-1">
+                                  <div className="text-sm text-gray-600">태그</div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {frontmatterData.tags.split(',').map((tag, index) => (
+                                      <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                                        {tag.trim()}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {frontmatterData.description && (
+                                <div className="md:col-span-2 space-y-1">
+                                  <div className="text-sm text-gray-600">설명</div>
+                                  <div className="text-gray-900 leading-relaxed">{frontmatterData.description}</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* 본문 내용 */}
+                    <div className="rounded-lg bg-white border border-gray-200 p-6 overflow-hidden">
+                      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-muted-foreground break-words">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                          // frontmatter 스타일 처리
+                          hr: () => null, // --- 구분선 숨기기
+                          code({ node, inline, className, children, ...props }) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            const [copied, setCopied] = useState(false);
+                            
+                            const handleCopy = () => {
+                              navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            };
+                            
+                            return !inline && match ? (
+                              <div className="relative group my-6">
+                                <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-gray-900 to-gray-800 rounded-t-lg flex items-center justify-between px-4">
+                                  <span className="text-xs font-medium text-gray-400">{match[1]}</span>
+                                  <button
+                                    onClick={handleCopy}
+                                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+                                  >
+                                    {copied ? (
+                                      <>
+                                        <Check className="w-3 h-3" />
+                                        복사됨
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-3 h-3" />
+                                        복사
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                                <div className="overflow-hidden rounded-lg shadow-xl">
+                                  <SyntaxHighlighter
+                                    style={vscDarkPlus}
+                                    language={match[1]}
+                                    PreTag="div"
+                                    className="!mt-0"
+                                    wrapLongLines={true}
+                                    showLineNumbers={true}
+                                    customStyle={{
+                                      margin: 0,
+                                      paddingTop: '3rem',
+                                      paddingBottom: '1rem',
+                                      paddingLeft: '1rem',
+                                      paddingRight: '1rem',
+                                      fontSize: '0.875rem',
+                                      lineHeight: '1.7',
+                                      maxHeight: '500px',
+                                      overflow: 'auto',
+                                      backgroundColor: '#1e1e1e',
+                                      borderRadius: '0.5rem'
+                                    }}
+                                    {...props}
+                                  >
+                                    {String(children).replace(/\n$/, '')}
+                                  </SyntaxHighlighter>
+                                </div>
+                              </div>
+                            ) : (
+                              <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                          h1: ({ children }) => <h1 className="text-2xl font-bold mt-8 mb-4 text-gray-900">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-xl font-semibold mt-6 mb-3 text-gray-800">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-lg font-medium mt-5 mb-2 text-gray-700">{children}</h3>,
+                          ul: ({ children }) => <ul className="list-disc pl-6 my-4 space-y-2">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-6 my-4 space-y-2">{children}</ol>,
+                          li: ({ children }) => <li className="text-gray-600 leading-relaxed">{children}</li>,
+                          p: ({ children }) => <p className="my-4 leading-relaxed text-gray-700 whitespace-pre-wrap">{children}</p>,
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-4 border-blue-400 pl-4 my-6 bg-blue-50 py-3 pr-4 rounded-r-lg">
+                              <p className="text-gray-700 italic">{children}</p>
+                            </blockquote>
+                          ),
+                          table: ({ children }) => (
+                            <div className="overflow-x-auto my-4">
+                              <table className="min-w-full divide-y divide-border">{children}</table>
+                            </div>
+                          ),
+                          th: ({ children }) => (
+                            <th className="px-4 py-2 text-left text-sm font-medium bg-muted">{children}</th>
+                          ),
+                          td: ({ children }) => (
+                            <td className="px-4 py-2 text-sm border-t break-words">{children}</td>
+                          ),
+                        }}
+                      >
+                        {(() => {
+                          let content = selectedSession.mdxContent;
+                          
+                          // frontmatter가 한 줄로 되어있는 경우 처리
+                          const oneLinerMatch = content.match(/^---\s*(title:.*?)---/);
+                          if (oneLinerMatch) {
+                            // 각 속성을 찾아서 줄바꿈 추가
+                            const frontmatterLine = oneLinerMatch[1];
+                            const formattedFrontmatter = frontmatterLine
+                              .replace(/\s+(title:|date:|tags:|category:|author:|description:)/g, '\n$1')
+                              .trim();
+                            
+                            content = content.replace(oneLinerMatch[0], `---\n${formattedFrontmatter}\n---`);
+                          }
+                          
+                          // 이제 정상적인 frontmatter 매칭
+                          const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+                          
+                          if (frontmatterMatch) {
+                            // frontmatter 제거하고 본문만 표시
+                            const bodyContent = content.replace(/^---\n[\s\S]*?\n---\n?/, '');
+                            return bodyContent;
+                          }
+                          
+                          return content;
+                        })()}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

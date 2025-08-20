@@ -70,3 +70,100 @@ export interface Project {
   status: "active" | "idle";
   unanalyzedCount?: number;
 }
+
+export interface Statistics {
+  totalProjects: number;
+  totalSessions: number;
+  totalReports: number;
+  topTopics?: Array<{
+    topic: string;
+    count: number;
+    percentage: number;
+  }>;
+  timeline: {
+    dailyActivity: Array<{
+      date: string;
+      sessionCount: number;
+    }>;
+    averageDailySessions: number;
+  };
+  keyInsights?: Array<{
+    insight: string;
+    projects: string[];
+  }>;
+  issuesSolutions?: Array<{
+    issue: string;
+    solution: string;
+    count: number;
+  }>;
+}
+
+export interface GlobalStatistics {
+  totalProjects: number;
+  totalSessions: number;
+  totalReports: number;
+  projectList?: string[];
+  selectedProject?: string;
+  dateRange: {
+    start: string;
+    end: string;
+  };
+  keyTopics: Array<{
+    topic: string;
+    count: number;
+    percentage: number;
+    projects: string[];
+  }>;
+  codeQuality: {
+    totalStrengths: Array<{
+      description: string;
+      count: number;
+    }>;
+    totalImprovements: Array<{
+      description: string;
+      count: number;
+    }>;
+    averageQualityScore?: number;
+  };
+  taskAnalysis: {
+    mainTasks: Array<{
+      task: string;
+      count: number;
+      projects: string[];
+    }>;
+    issues: Array<{
+      issue: string;
+      count: number;
+      projects: string[];
+      solutions: Array<{
+        solution: string;
+        frequency: number;
+      }>;
+    }>;
+    commonSolutions: Array<{
+      solution: string;
+      count: number;
+      relatedIssues: string[];
+    }>;
+  };
+  insights: {
+    topInsights: Array<{
+      insight: string;
+      frequency: number;
+      projects: string[];
+    }>;
+    commonPatterns: string[];
+  };
+  timeline: {
+    dailyActivity: Array<{
+      date: string;
+      sessionCount: number;
+      projectCount: number;
+    }>;
+    weeklyActivity: Array<{
+      week: string;
+      sessionCount: number;
+      projectCount: number;
+    }>;
+  };
+}

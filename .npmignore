@@ -1,0 +1,47 @@
+# Source files
+src/
+tests/
+analyzer-debug.log
+
+# Development files
+.env
+.env.example
+*.log
+.vscode/
+.idea/
+.claude/
+
+# TypeScript config files  
+tsconfig.json
+tsconfig.cli.json
+tsconfig.node.json
+
+# Build config files
+vite.config.ts
+vite.config.mjs
+postcss.config.js
+tailwind.config.js
+
+# Node modules
+node_modules/
+
+# Local data
+claude-report-data/
+reports/
+
+# Documentation
+PRD.md
+CLAUDE.md
+
+# Git
+.git/
+.gitignore
+
+# Test files
+test-*.ts
+test-*.jsonl
+quick-test-ai.ts
+test-project/
+test-mini-project/
+tests/
+tmp/
