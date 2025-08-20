@@ -91,6 +91,23 @@
   }
 }
 
+/* 애니메이션 효과 */
+@keyframes tilt {
+  0%, 50%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(1deg);
+  }
+  75% {
+    transform: rotate(-1deg);
+  }
+}
+
+.animate-tilt {
+  animation: tilt 10s infinite linear;
+}
+
 /* 코드 블록 스타일 개선 */
 @layer components {
   /* 코드 블록 헤더 호버 효과 */

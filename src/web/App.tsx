@@ -7,6 +7,7 @@ import ProjectDetail from './components/ProjectDetail';
 import ReportViewer from './components/ReportViewer';
 import Statistics from './components/Statistics';
 import { AnalysisProvider } from './contexts/AnalysisContext';
+import ClaudeLogo from './components/ClaudeLogo';
 
 function Navigation() {
   const location = useLocation();
@@ -49,12 +50,14 @@ function App() {
           <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
             <div className="container mx-auto flex h-16 items-center px-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-                  <BarChart3 className="h-6 w-6" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+                  <ClaudeLogo className="h-8 w-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold">Claude 리포트 분석기</h1>
-                  <p className="text-xs text-muted-foreground">Claude Code 대화 세션 분석 도구</p>
+                  <h1 className="text-xl font-bold text-gray-900">
+                    Claude Report Analyzer
+                  </h1>
+                  <p className="text-xs text-muted-foreground">AI 대화 세션 분석 및 인사이트 도구</p>
                 </div>
               </div>
               <Navigation />
