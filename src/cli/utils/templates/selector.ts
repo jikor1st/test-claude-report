@@ -9,18 +9,34 @@ export class TemplateSelector {
     // 각 템플릿별 점수 계산
     const scores = this.calculateTemplateScores(sessionContent);
     
-    // 가장 높은 점수의 템플릿 선택
-    const bestMatch = scores.reduce((best, current) => 
-      current.score > best.score ? current : best
+    // general 템플릿 제외하고 가장 높은 점수 찾기
+    const nonGeneralScores = scores.filter(s => s.type !== 'general');
+    const bestNonGeneral = nonGeneralScores.reduce((best, current) => 
+      current.score > best.score ? current : best, nonGeneralScores[0] || { score: 0, type: 'general' as TemplateType, matchedKeywords: [] }
     );
 
+    // 신뢰도 임계값 설정
+    const MIN_CONFIDENCE_THRESHOLD = 0.3; // 30% 미만이면 템플릿 사용 안함
+    const MIN_SCORE_THRESHOLD = 3; // 최소 3점 이상이어야 템플릿 사용
+
     // 신뢰도 계산 (0-1 사이의 값)
-    const confidence = Math.min(bestMatch.score / 10, 1);
+    const confidence = Math.min(bestNonGeneral.score / 15, 1); // 15점 만점으로 조정
+
+    // 템플릿을 사용할지 결정
+    const shouldUseTemplate = confidence >= MIN_CONFIDENCE_THRESHOLD && bestNonGeneral.score >= MIN_SCORE_THRESHOLD;
+
+    if (!shouldUseTemplate) {
+      return {
+        templateType: null, // 템플릿 사용 안함
+        confidence: 0,
+        reason: `템플릿 매칭 신뢰도가 낮음 (${(confidence * 100).toFixed(0)}%). 자유 형식으로 분석합니다.`
+      };
+    }
 
     return {
-      templateType: bestMatch.type,
+      templateType: bestNonGeneral.type,
       confidence,
-      reason: this.generateReason(bestMatch.type, bestMatch.matchedKeywords)
+      reason: this.generateReason(bestNonGeneral.type, bestNonGeneral.matchedKeywords)
     };
   }
 

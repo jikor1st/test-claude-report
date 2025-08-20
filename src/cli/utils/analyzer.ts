@@ -6,6 +6,67 @@ import type { ClaudeAnalysisResult, ClaudeAnalysisResponse } from '../types/anal
 import { findSessionFiles, parseSessionFile, analyzeSessionContent, groupSessionsByDate } from './sessionAnalyzer';
 import { safeStringify } from '../../shared/utils';
 
+/**
+ * 자유 형식 마크다운 생성
+ */
+function createFreeFormMarkdown(analysis: any): string {
+  const sections = [];
+  
+  // 제목 및 요약
+  sections.push(`# ${analysis.title || '세션 분석 리포트'}`);
+  
+  if (analysis.summary) {
+    sections.push(`## 📋 요약\n\n${analysis.summary}`);
+  }
+  
+  // 주요 인사이트
+  if (analysis.keyInsights && analysis.keyInsights.length > 0) {
+    sections.push(`## 💡 주요 인사이트\n\n${analysis.keyInsights.map((insight: string) => `- ${insight}`).join('\n')}`);
+  }
+  
+  // 기술적 세부사항
+  if (analysis.technicalDetails) {
+    const techSections = [];
+    
+    if (analysis.technicalDetails.languages && analysis.technicalDetails.languages.length > 0) {
+      techSections.push(`**프로그래밍 언어:** ${analysis.technicalDetails.languages.join(', ')}`);
+    }
+    
+    if (analysis.technicalDetails.frameworks && analysis.technicalDetails.frameworks.length > 0) {
+      techSections.push(`**프레임워크/라이브러리:** ${analysis.technicalDetails.frameworks.join(', ')}`);
+    }
+    
+    if (analysis.technicalDetails.tools && analysis.technicalDetails.tools.length > 0) {
+      techSections.push(`**사용된 도구:** ${analysis.technicalDetails.tools.join(', ')}`);
+    }
+    
+    if (analysis.technicalDetails.concepts && analysis.technicalDetails.concepts.length > 0) {
+      techSections.push(`**기술적 개념:** ${analysis.technicalDetails.concepts.join(', ')}`);
+    }
+    
+    if (techSections.length > 0) {
+      sections.push(`## 🔧 기술적 세부사항\n\n${techSections.join('\n\n')}`);
+    }
+  }
+  
+  // 주요 활동
+  if (analysis.mainActivities && analysis.mainActivities.length > 0) {
+    sections.push(`## 📝 주요 활동\n\n${analysis.mainActivities.map((activity: string) => `- ${activity}`).join('\n')}`);
+  }
+  
+  // 성과
+  if (analysis.outcomes && analysis.outcomes.length > 0) {
+    sections.push(`## ✅ 달성된 성과\n\n${analysis.outcomes.map((outcome: string) => `- ${outcome}`).join('\n')}`);
+  }
+  
+  // 다음 단계
+  if (analysis.nextSteps && analysis.nextSteps.length > 0) {
+    sections.push(`## 🔜 제안되는 다음 단계\n\n${analysis.nextSteps.map((step: string) => `- ${step}`).join('\n')}`);
+  }
+  
+  return sections.join('\n\n');
+}
+
 export async function analyzeProject(
   projectPath: string, 
   options: { 
@@ -246,15 +307,17 @@ export async function analyzeSingleSession(
       const { analysis: aiAnalysis, templateType } = aiAnalysisResult as any;
       
       // MD 템플릿 로드 및 적용 (2단계 분석으로 강화된 데이터 사용)
-      const { loadMdTemplate, fillMdTemplate } = await import('./templates/mdTemplates');
       let mdxContent: string;
       
       if (templateType) {
         console.log(`  📝 MD 템플릿 적용: ${templateType}`);
+        const { loadMdTemplate, fillMdTemplate } = await import('./templates/mdTemplates');
         const mdTemplate = await loadMdTemplate(templateType);
         mdxContent = fillMdTemplate(mdTemplate, aiAnalysis, session);
       } else {
-        mdxContent = `# ${aiAnalysis.title}\n\n## 요약\n${aiAnalysis.summary}\n\n## 주요 인사이트\n${aiAnalysis.keyInsights.map((insight: string) => `- ${insight}`).join('\n')}\n\n## 사용된 기술\n${[...aiAnalysis.technicalDetails.languages, ...aiAnalysis.technicalDetails.frameworks].map((tech: string) => `- ${tech}`).join('\n')}`;
+        console.log(`  🆓 자유 형식 리포트 생성`);
+        // 자유 형식으로 마크다운 생성
+        mdxContent = createFreeFormMarkdown(aiAnalysis);
       }
       
       // AI 분석 결과로 리포트 생성
