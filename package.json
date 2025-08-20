@@ -1,6 +1,6 @@
 {
-  "name": "claude-report-analyzer",
-  "version": "1.0.0",
+  "name": "@jeongseonju15/claude-report-analyzer",
+  "version": "1.0.4",
   "description": "Analyze and visualize Claude Code conversation sessions",
   "main": "dist/cli/index.js",
   "scripts": {

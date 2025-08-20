@@ -5,28 +5,9 @@ import type { ClaudeSession, ClaudeMessage } from './sessionAnalyzer';
 import { TemplateSelector } from './templates/selector';
 import { templatePrompts } from './templates/prompts';
 import { TemplateType } from './templates/types';
+import type { ClaudeAnalysisResult } from '../types/analysis';
 
 const execAsync = promisify(exec);
-
-interface ClaudeAnalysisResult {
-  title: string;
-  summary: string;
-  keyInsights: string[];
-  technicalDetails: {
-    languages: string[];
-    frameworks: string[];
-    toolsUsed: string[];
-  };
-  codeQuality: {
-    strengths: string[];
-    improvements: string[];
-  };
-  timeline: {
-    mainTasks: string[];
-    completedGoals: string[];
-    challenges: string[];
-  };
-}
 
 /**
  * Claude Code CLI를 사용하여 세션 분석 (2단계 분석)
@@ -98,16 +79,17 @@ export async function analyzeWithClaudeCode(session: ClaudeSession): Promise<{ a
         console.error('Claude 분석 중 오류:', stderr);
       }
       
-      if (!stdout || stdout.trim().length === 0) {
+      const outputStr = stdout.toString();
+      if (!outputStr || outputStr.trim().length === 0) {
         console.error('Claude가 빈 응답을 반환했습니다.');
         return null;
       }
 
       // 결과 파싱 (템플릿 타입에 따라 다르게 처리)
-      const result = parseAnalysisResult(stdout, templateAnalysis.templateType);
+      const result = parseAnalysisResult(outputStr, templateAnalysis.templateType);
       
       if (!result) {
-        console.log('파싱 실패. 응답 샘플:', stdout.substring(0, 500));
+        console.log('파싱 실패. 응답 샘플:', outputStr.substring(0, 500));
         return null;
       }
       
@@ -207,11 +189,11 @@ function createAnalysisPromptWithTemplate(session: ClaudeSession, templateType: 
     if (idx === 0 || idx === session.messages.length - 1) return true;
     
     // 에러나 해결책이 포함된 메시지
-    if (errorMessages.some(e => e.messageIndex === idx)) return true;
-    if (solutionMessages.some(s => s.messageIndex === idx)) return true;
+    if (errorMessages.some((e: any) => e.messageIndex === idx)) return true;
+    if (solutionMessages.some((s: any) => s.messageIndex === idx)) return true;
     
     // 도구 사용이 포함된 메시지
-    if (toolUsages.some(t => msg.timestamp === t.timestamp)) return true;
+    if (toolUsages.some((t: any) => msg.timestamp === t.timestamp)) return true;
     
     // 코드 블록이 포함된 메시지
     if (msg.content.includes('```')) return true;
@@ -224,7 +206,7 @@ function createAnalysisPromptWithTemplate(session: ClaudeSession, templateType: 
   
   if (todos.length > 0) {
     structuredSummary += '\n\n## 주요 작업 (TODOs):\n';
-    todos.forEach((todo, idx) => {
+    todos.forEach((todo: any, idx: number) => {
       if (idx < 10) { // 최대 10개만
         structuredSummary += `- [${todo.status}] ${todo.content}\n`;
       }
@@ -233,7 +215,7 @@ function createAnalysisPromptWithTemplate(session: ClaudeSession, templateType: 
   
   if (structuredPatches.length > 0) {
     structuredSummary += '\n\n## 코드 변경사항:\n';
-    structuredPatches.forEach((patch, idx) => {
+    structuredPatches.forEach((patch: any, idx: number) => {
       if (idx < 5) { // 최대 5개만
         structuredSummary += `\n### ${patch.file}\n`;
         structuredSummary += '```' + (patch.language || '') + '\n';
@@ -246,7 +228,7 @@ function createAnalysisPromptWithTemplate(session: ClaudeSession, templateType: 
   
   if (errorMessages.length > 0) {
     structuredSummary += '\n\n## 발견된 에러:\n';
-    errorMessages.slice(0, 5).forEach(err => {
+    errorMessages.slice(0, 5).forEach((err: any) => {
       structuredSummary += `- ${err.matchedText}\n`;
     });
   }
